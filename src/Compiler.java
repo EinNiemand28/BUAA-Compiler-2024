@@ -1,6 +1,6 @@
-import frontend.Lexer.Lexer;
-import frontend.Lexer.Token;
-import frontend.Lexer.TokenStream;
+import frontend.lexer.Lexer;
+import frontend.lexer.Token;
+import frontend.lexer.TokenStream;
 import util.Printer;
 
 import java.io.FileInputStream;

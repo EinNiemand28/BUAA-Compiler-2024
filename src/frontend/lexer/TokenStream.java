@@ -1,4 +1,4 @@
-package frontend.Lexer;
+package frontend.lexer;
 
 import java.util.List;
 

@@ -1,7 +1,7 @@
 package util;
 
 import enums.ErrorType;
-import frontend.Lexer.Token;
+import frontend.lexer.Token;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
