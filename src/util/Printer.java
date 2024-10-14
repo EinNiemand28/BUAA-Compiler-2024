@@ -10,10 +10,12 @@ import java.io.IOException;
 public class Printer {
 
     private static FileOutputStream lexerFile = null;
+    private static FileOutputStream parserFile = null;
     private static FileOutputStream errorFile = null;
 
     public static void init() throws FileNotFoundException {
         lexerFile = new FileOutputStream("lexer.txt");
+        parserFile = new FileOutputStream("parser.txt");
         errorFile = new FileOutputStream("error.txt");
     }
 
@@ -27,6 +29,7 @@ public class Printer {
 
     public static void close() throws IOException {
         lexerFile.close();
+        parserFile.close();
         errorFile.close();
     }
 }
