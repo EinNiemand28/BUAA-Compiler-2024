@@ -7,12 +7,13 @@ import util.Printer;
 import java.io.IOException;
 import java.io.PushbackInputStream;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Lexer {
     private final PushbackInputStream stream;
     private char curChar;
     private int lineno;
-    private final ArrayList<Token> tokenList;
+    private final List<Token> tokenList;
 
     public Lexer(PushbackInputStream stream) {
         this.stream = stream;
@@ -20,7 +21,7 @@ public class Lexer {
         this.tokenList = new ArrayList<>();
     }
 
-    public ArrayList<Token> getTokenList() throws IOException {
+    public List<Token> getTokenList() throws IOException {
         if (!tokenList.isEmpty()) {
             return tokenList;
         }
