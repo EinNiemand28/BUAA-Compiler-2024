@@ -274,7 +274,7 @@ return new Token(TokenType.getTokenType(sb.toString()), sb.toString(), lineno);
 │       ├───📄 Lexer.java
 │       ├───📄 Token.java
 │       └───📄 TokenStream.java
-├───📁 util/
+├───📁 utils/
 │   └───📄 Printer.java
 └───📄 Compiler.java
 ```

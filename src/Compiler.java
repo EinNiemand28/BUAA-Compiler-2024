@@ -1,7 +1,9 @@
 import frontend.lexer.Lexer;
-import frontend.lexer.Token;
 import frontend.lexer.TokenStream;
-import util.Printer;
+import frontend.parser.Parser;
+import frontend.parser.node.CompUnitNode;
+import utils.Printer;
+import utils.Recoder;
 
 import java.io.FileInputStream;
 import java.io.PushbackInputStream;
@@ -13,10 +15,11 @@ public class Compiler {
         Printer.init();
 
         Lexer lexer = new Lexer(input);
-        TokenStream tokenStream = new TokenStream(lexer.getTokenList());
-        for (Token token = tokenStream.read(); token != null; token = tokenStream.read()) {
-            Printer.printToken(token);
-        }
+        Parser parser = new Parser(new TokenStream(lexer.getTokenList()));
+        parser.parse();
+        CompUnitNode compUnit = parser.getCompUnit();
+
+        Recoder.printErrorMessages();
 
         input.close();
         Printer.close();

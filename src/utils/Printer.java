@@ -1,6 +1,5 @@
-package util;
+package utils;
 
-import enums.ErrorType;
 import frontend.lexer.Token;
 
 import java.io.FileNotFoundException;
@@ -23,8 +22,12 @@ public class Printer {
         lexerFile.write(token.toString().getBytes());
     }
 
-    public static void printErrorMessage(ErrorType error, int lineno) throws IOException {
-        errorFile.write((lineno + " " + error.toString() + "\n").getBytes());
+    public static void printSyntaxComp(String syntaxComp) throws IOException {
+        parserFile.write(syntaxComp.getBytes());
+    }
+
+    public static void printErrorMessage(Error error) throws IOException {
+        errorFile.write(error.toString().getBytes());
     }
 
     public static void close() throws IOException {

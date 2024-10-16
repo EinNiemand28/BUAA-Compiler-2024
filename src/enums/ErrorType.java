@@ -3,6 +3,9 @@ package enums;
 public enum ErrorType {
     illegalSymbol("a"),
     nameRedefinition("b"),
+    missingSEMICN("i"),
+    missingRPARENT("j"),
+    missingRBRACK("k"),
     ;
 
     private final String value;
