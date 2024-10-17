@@ -5,6 +5,7 @@ import frontend.lexer.Token;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 public class Printer {
 
@@ -16,6 +17,12 @@ public class Printer {
         lexerFile = new FileOutputStream("lexer.txt");
         parserFile = new FileOutputStream("parser.txt");
         errorFile = new FileOutputStream("error.txt");
+    }
+
+    public static void printTokens(List<Token> tokenList) throws IOException {
+        for (Token token : tokenList) {
+            printToken(token);
+        }
     }
 
     public static void printToken(Token token) throws IOException {

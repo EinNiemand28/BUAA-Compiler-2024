@@ -20,7 +20,7 @@ import java.util.List;
 public class Parser {
     private final TokenStream tokenStream;
     private Token curToken;
-    private CompUnitNode compUnitNode;
+    private Node compUnitNode;
 
     public Parser(TokenStream tokenStream) {
         this.tokenStream = tokenStream;
@@ -28,12 +28,12 @@ public class Parser {
         this.compUnitNode = null;
     }
 
-    public CompUnitNode getCompUnit() {
+    public Node getCompUnit() {
         return compUnitNode;
     }
 
     public void parse() {
-        if (compUnitNode != null) { compUnitNode = (CompUnitNode) parseCompUnit(); }
+        if (compUnitNode == null) { compUnitNode = parseCompUnit(); }
     }
 
     private void read() {
@@ -74,7 +74,6 @@ public class Parser {
             unread(mainFuncDefNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(mainFuncDefNode); }
-
         return new CompUnitNode(SyntaxCompType.CompUnit, children);
     }
 
@@ -88,7 +87,7 @@ public class Parser {
             unread(constDeclNode.getSize());
         } else {
             children.add(constDeclNode);
-            return new ConstDeclNode(SyntaxCompType.ConstDecl, children);
+            return new DeclNode(SyntaxCompType.Decl, children);
         }
 
         Node varDeclNode = parseVarDecl();
@@ -172,25 +171,24 @@ public class Parser {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+        
         read();
-        if (curToken.type() != TokenType.LBRACK) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+        if (curToken.type() == TokenType.LBRACK) {
+            children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+            Node constExpNode = parseConstExp();
+            if (constExpNode.getType() == SyntaxCompType.FAIL) {
+                unread(constExpNode.getSize());
+                return new Node(SyntaxCompType.FAIL, children);
+            } else { children.add(constExpNode); }
 
-        Node constExpNode = parseConstExp();
-        if (constExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(constExpNode.getSize());
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(constExpNode); }
-
-        int lineno = curToken.lineno();
-        read();
-        if (curToken.type() != TokenType.RBRACK) {
-            unread();
-            Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
-            children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+            int lineno = curToken.lineno();
+            read();
+            if (curToken.type() != TokenType.RBRACK) {
+                unread();
+                Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
+            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+        } else { unread(); }
 
         read();
         if (curToken.type() != TokenType.ASSIGN) {
@@ -228,12 +226,17 @@ public class Parser {
             children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
         } else {
             unread();
-            return new ConstInitValNode(SyntaxCompType.FAIL, children);
+            return new Node(SyntaxCompType.FAIL, children);
         }
 
         constExpNode = parseConstExp();
         if (constExpNode.getType() == SyntaxCompType.FAIL) {
             unread(constExpNode.getSize());
+            read();
+            if (curToken.type() != TokenType.RBRACE) {
+                unread();
+                return new Node(SyntaxCompType.FAIL, children);
+            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
             return new ConstInitValNode(SyntaxCompType.ConstInitVal, children);
         } else { children.add(constExpNode); }
         while (true) {
@@ -248,10 +251,11 @@ public class Parser {
                 break;
             } else { children.add(constExpNode); }
         }
+        
         read();
         if (curToken.type() != TokenType.RBRACE) {
             unread();
-            return new ConstInitValNode(SyntaxCompType.FAIL, children);
+            return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new ConstInitValNode(SyntaxCompType.ConstInitVal, children);
     }
@@ -367,7 +371,12 @@ public class Parser {
         expNode = parseExp();
         if (expNode.getType() == SyntaxCompType.FAIL) {
             unread(expNode.getSize());
-            return new Node(SyntaxCompType.FAIL, children);
+            read();
+            if (curToken.type() != TokenType.RBRACE) {
+                unread();
+                return new Node(SyntaxCompType.FAIL, children);
+            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+            return new Node(SyntaxCompType.InitVal, children);
         } else { children.add(expNode); }
         while (true) {
             read();
@@ -381,6 +390,7 @@ public class Parser {
                 break;
             } else { children.add(expNode); }
         }
+
         read();
         if (curToken.type() != TokenType.RBRACE) {
             unread();
@@ -416,7 +426,6 @@ public class Parser {
         Node funcFParamsNode = parseFuncFParams();
         if (funcFParamsNode.getType() == SyntaxCompType.FAIL) {
             unread(funcFParamsNode.getSize());
-            return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(funcFParamsNode); }
 
         int lineno = curToken.lineno();
@@ -452,12 +461,12 @@ public class Parser {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
         read();
         if (curToken.type() != TokenType.LPARENT) {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+
         int lineno = curToken.lineno();
         read();
         if (curToken.type() != TokenType.RPARENT) {
@@ -560,6 +569,7 @@ public class Parser {
                 break;
             } else { children.add(blockItemNode); }
         }
+
         read();
         if (curToken.type() != TokenType.RBRACE) {
             unread();
@@ -738,11 +748,11 @@ public class Parser {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-        Node stmtNode = parseStmt();
-        if (stmtNode.getType() == SyntaxCompType.FAIL) {
-            unread(stmtNode.getSize());
+        Node condNode = parseCond();
+        if (condNode.getType() == SyntaxCompType.FAIL) {
+            unread(condNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(stmtNode); }
+        } else { children.add(condNode); }
 
         int lineno = curToken.lineno();
         read();
@@ -752,7 +762,7 @@ public class Parser {
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
-        stmtNode = parseStmt();
+        Node stmtNode = parseStmt();
         if (stmtNode.getType() == SyntaxCompType.FAIL) {
             unread(stmtNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
@@ -995,15 +1005,18 @@ public class Parser {
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
-        read();
-        if (curToken.type() == TokenType.COMMA) {
-            children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+        while (true) {
+            read();
+            if (curToken.type() != TokenType.COMMA) {
+                unread();
+                break;
+            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
             Node expNode = parseExp();
             if (expNode.getType() == SyntaxCompType.FAIL) {
-                unread();
-                return new Node(SyntaxCompType.FAIL, children);
+                unread(expNode.getSize());
+                break;
             } else { children.add(expNode); }
-        } else { unread(); }
+        }
 
         int lineno = curToken.lineno();
         read();
@@ -1129,6 +1142,7 @@ public class Parser {
                 Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+            return new PrimaryExpNode(SyntaxCompType.PrimaryExp, children);
         } else { unread(); }
 
         Node lValNode = parseLVal();
@@ -1144,7 +1158,7 @@ public class Parser {
             unread(numberNode.getSize());
         } else {
             children.add(numberNode);
-            return new NumberNode(SyntaxCompType.Number, children);
+            return new PrimaryExpNode(SyntaxCompType.PrimaryExp, children);
         }
 
         Node characterNode = parseCharacter();
@@ -1152,7 +1166,7 @@ public class Parser {
             unread(characterNode.getSize());
         } else {
             children.add(characterNode);
-            return new CharacterNode(SyntaxCompType.Character, children);
+            return new PrimaryExpNode(SyntaxCompType.PrimaryExp, children);
         }
         return new Node(SyntaxCompType.FAIL, children);
     }
@@ -1194,23 +1208,25 @@ public class Parser {
         if (curToken.type() == TokenType.IDENFR) {
             children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
             read();
-            if (curToken.type() != TokenType.LPARENT) {
-                unread();
-                return new Node(SyntaxCompType.FAIL, children);
-            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-            Node funcRParamsNode = parseFuncRParams();
-            if (funcRParamsNode.getType() == SyntaxCompType.FAIL) {
-                unread(funcRParamsNode.getSize());
-            } else { children.add(funcRParamsNode); }
+            if (curToken.type() == TokenType.LPARENT) {
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                Node funcRParamsNode = parseFuncRParams();
+                if (funcRParamsNode.getType() == SyntaxCompType.FAIL) {
+                    unread(funcRParamsNode.getSize());
+                } else { children.add(funcRParamsNode); }
 
-            int lineno = curToken.lineno();
-            read();
-            if (curToken.type() != TokenType.RPARENT) {
-                unread();
-                Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
-                children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
-            } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-            return new UnaryExpNode(SyntaxCompType.UnaryExp, children);
+                int lineno = curToken.lineno();
+                read();
+                if (curToken.type() != TokenType.RPARENT) {
+                    unread();
+                    Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+                    children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
+                } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+                return new UnaryExpNode(SyntaxCompType.UnaryExp, children);
+            } else {
+                unread(2);
+                children.clear();
+            }
         } else { unread(); }
 
         Node primaryExpNode = parsePrimaryExp();
@@ -1218,7 +1234,7 @@ public class Parser {
             unread(primaryExpNode.getSize());
         } else {
             children.add(primaryExpNode);
-            return new PrimaryExpNode(SyntaxCompType.PrimaryExp, children);
+            return new UnaryExpNode(SyntaxCompType.UnaryExp, children);
         }
 
         Node unaryOpNode = parseUnaryOp();
@@ -1285,30 +1301,28 @@ public class Parser {
         Node unaryExpNode = parseUnaryExp();
         if (unaryExpNode.getType() == SyntaxCompType.FAIL) {
             unread(unaryExpNode.getSize());
-        } else {
-            children.add(unaryExpNode);
-            return new MulExpNode(SyntaxCompType.MulExp, children);
-        }
-
-        Node mulExpNode = parseMulExp();
-        if (mulExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(mulExpNode.getSize());
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(mulExpNode); }
-
-        read();
-        if (curToken.type() != TokenType.MULT &&
-            curToken.type() != TokenType.DIV &&
-            curToken.type() != TokenType.MOD) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        unaryExpNode = parseUnaryExp();
-        if (unaryExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(unaryExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(unaryExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.MULT || 
+                curToken.type() == TokenType.DIV || 
+                curToken.type() == TokenType.MOD) {
+                Node mulExpNode = new MulExpNode(SyntaxCompType.MulExp, new ArrayList<>(children));
+                children.clear();
+                children.add(mulExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                unaryExpNode = parseUnaryExp();
+                if (unaryExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(unaryExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(unaryExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new MulExpNode(SyntaxCompType.MulExp, children);
     }
 
@@ -1320,29 +1334,27 @@ public class Parser {
         Node mulExpNode = parseMulExp();
         if (mulExpNode.getType() == SyntaxCompType.FAIL) {
             unread(mulExpNode.getSize());
-        } else {
-            children.add(mulExpNode);
-            return new AddExpNode(SyntaxCompType.AddExp, children);
-        }
-
-        Node addExpNode = parseAddExp();
-        if (addExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(addExpNode.getSize());
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(addExpNode); }
-
-        read();
-        if (curToken.type() != TokenType.PLUS &&
-            curToken.type() != TokenType.MINU) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        mulExpNode = parseMulExp();
-        if (mulExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(mulExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(mulExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.PLUS || 
+                curToken.type() == TokenType.MINU) {
+                Node addExpNode = new AddExpNode(SyntaxCompType.AddExp, new ArrayList<>(children));
+                children.clear();
+                children.add(addExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                mulExpNode = parseMulExp();
+                if (mulExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(mulExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(mulExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new AddExpNode(SyntaxCompType.AddExp, children);
     }
 
@@ -1354,25 +1366,29 @@ public class Parser {
         Node addExpNode = parseAddExp();
         if (addExpNode.getType() == SyntaxCompType.FAIL) {
             unread(addExpNode.getSize());
-        } else {
-            children.add(addExpNode);
-            return new RelExpNode(SyntaxCompType.RelExp, children);
-        }
-
-        read();
-        if (curToken.type() != TokenType.LSS &&
-            curToken.type() != TokenType.GRE &&
-            curToken.type() != TokenType.LEQ &&
-            curToken.type() != TokenType.GEQ) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        addExpNode = parseAddExp();
-        if (addExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(addExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(addExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.LSS || 
+                curToken.type() == TokenType.LEQ || 
+                curToken.type() == TokenType.GRE || 
+                curToken.type() == TokenType.GEQ) {
+                Node relExpNode = new RelExpNode(SyntaxCompType.RelExp, new ArrayList<>(children));
+                children.clear();
+                children.add(relExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                addExpNode = parseAddExp();
+                if (addExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(addExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(addExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new RelExpNode(SyntaxCompType.RelExp, children);
     }
 
@@ -1384,22 +1400,27 @@ public class Parser {
         Node relExpNode = parseRelExp();
         if (relExpNode.getType() == SyntaxCompType.FAIL) {
             unread(relExpNode.getSize());
-        } else {
-            children.add(relExpNode);
-            return new EqExpNode(SyntaxCompType.EqExp, children);
-        }
-
-        read();
-        if (curToken.type() != TokenType.EQL &&
-            curToken.type() != TokenType.NEQ) {
-            unread();
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        relExpNode = parseEqExp();
-        if (relExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(relExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(relExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.EQL || 
+                curToken.type() == TokenType.NEQ) {
+                Node eqExpNode = new EqExpNode(SyntaxCompType.EqExp, new ArrayList<>(children));
+                children.clear();
+                children.add(eqExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                relExpNode = parseRelExp();
+                if (relExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(relExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(relExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new EqExpNode(SyntaxCompType.EqExp, children);
     }
 
@@ -1411,22 +1432,26 @@ public class Parser {
         Node eqExpNode = parseEqExp();
         if (eqExpNode.getType() == SyntaxCompType.FAIL) {
             unread(eqExpNode.getSize());
-        } else {
-            children.add(eqExpNode);
-            return new LAndExpNode(SyntaxCompType.LAndExp, children);
-        }
-
-        read();
-        if (curToken.type() != TokenType.AND) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        eqExpNode = parseEqExp();
-        if (eqExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(eqExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(eqExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.AND) {
+                Node lAndExpNode = new LAndExpNode(SyntaxCompType.LAndExp, new ArrayList<>(children));
+                children.clear();
+                children.add(lAndExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                eqExpNode = parseEqExp();
+                if (eqExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(eqExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(eqExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new LAndExpNode(SyntaxCompType.LAndExp, children);
     }
 
@@ -1438,22 +1463,26 @@ public class Parser {
         Node lAndExpNode = parseLAndExp();
         if (lAndExpNode.getType() == SyntaxCompType.FAIL) {
             unread(lAndExpNode.getSize());
-        } else {
-            children.add(lAndExpNode);
-            return new LOrExpNode(SyntaxCompType.LOrExp, children);
-        }
-
-        read();
-        if (curToken.type() != TokenType.OR) {
-            unread();
-            return new Node(SyntaxCompType.FAIL, children);
-        } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-
-        lAndExpNode = parseLOrExp();
-        if (lAndExpNode.getType() == SyntaxCompType.FAIL) {
-            unread(lAndExpNode.getSize());
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(lAndExpNode); }
+
+        while (true) {
+            read();
+            if (curToken.type() == TokenType.OR) {
+                Node lOrExpNode = new LOrExpNode(SyntaxCompType.LOrExp, new ArrayList<>(children));
+                children.clear();
+                children.add(lOrExpNode);
+                children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+                lAndExpNode = parseLAndExp();
+                if (lAndExpNode.getType() == SyntaxCompType.FAIL) {
+                    unread(lAndExpNode.getSize());
+                    return new Node(SyntaxCompType.FAIL, children);
+                } else { children.add(lAndExpNode); }
+            } else {
+                unread();
+                break;
+            }
+        }
         return new LOrExpNode(SyntaxCompType.LOrExp, children);
     }
 

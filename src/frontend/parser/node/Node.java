@@ -17,10 +17,12 @@ public class Node {
         this.type = type;
         this.children = children;
         if (type != SyntaxCompType.TOKEN) {
-            this.beginLine = children.get(0).beginLine;
-            this.endLine = children.get(children.size() - 1).endLine;
             this.size = 0;
-            for (Node child : children) { this.size += child.size; }
+            if (!children.isEmpty()) {
+                this.beginLine = children.get(0).beginLine;
+                this.endLine = children.get(children.size() - 1).endLine;
+                for (Node child : children) { this.size += child.size; }
+            } else { this.beginLine = this.endLine = 0; }
         } else {
             this.beginLine = this.endLine = 0;
             this.size = 1;
