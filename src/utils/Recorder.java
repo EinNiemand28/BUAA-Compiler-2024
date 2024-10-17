@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Recoder {
+public class Recorder {
     private static final List<Error> errors = new ArrayList<>();
 
     public static void addErrorMessage(ErrorType error, int lineno) {

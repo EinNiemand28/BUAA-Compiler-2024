@@ -2,7 +2,7 @@ package frontend.lexer;
 
 import enums.ErrorType;
 import enums.TokenType;
-import utils.Recoder;
+import utils.Recorder;
 
 import java.io.IOException;
 import java.io.PushbackInputStream;
@@ -79,14 +79,14 @@ public class Lexer {
         } else if (curChar == '&') {
             read();
             if (curChar != '&') {
-                Recoder.addErrorMessage(ErrorType.illegalSymbol, lineno);
+                Recorder.addErrorMessage(ErrorType.illegalSymbol, lineno);
                 unread();
             }
             sb.append('&');
         } else if (curChar == '|') {
             read();
             if (curChar != '|') {
-                Recoder.addErrorMessage(ErrorType.illegalSymbol, lineno);
+                Recorder.addErrorMessage(ErrorType.illegalSymbol, lineno);
                 unread();
             }
             sb.append('|');

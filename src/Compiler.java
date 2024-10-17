@@ -3,7 +3,7 @@ import frontend.lexer.TokenStream;
 import frontend.parser.Parser;
 import frontend.parser.node.CompUnitNode;
 import utils.Printer;
-import utils.Recoder;
+import utils.Recorder;
 
 import java.io.FileInputStream;
 import java.io.PushbackInputStream;
@@ -19,7 +19,7 @@ public class Compiler {
         parser.parse();
         CompUnitNode compUnit = parser.getCompUnit();
 
-        Recoder.printErrorMessages();
+        Recorder.printErrorMessages();
 
         input.close();
         Printer.close();
