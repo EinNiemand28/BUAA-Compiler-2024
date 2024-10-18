@@ -146,7 +146,6 @@ public class Lexer {
             if (curChar == '/') {
                 do { read(); } while (!isLineFeed() && !isEOF());
                 lineno++;
-                unread();
             } else {
                 read();
                 do {

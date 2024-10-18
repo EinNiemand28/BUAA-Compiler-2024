@@ -9,8 +9,8 @@ import java.util.List;
 public class Node {
     protected final SyntaxCompType type;
     protected final List<Node> children;
-    protected final int beginLine;
-    protected final int endLine;
+    protected int beginLine;
+    protected int endLine;
     protected int size;
 
     public Node(SyntaxCompType type, List<Node> children) {
@@ -35,6 +35,10 @@ public class Node {
 
     public int getSize() {
         return size;
+    }
+
+    public int getEndLine() {
+        return endLine;
     }
 
     public void print() throws IOException {

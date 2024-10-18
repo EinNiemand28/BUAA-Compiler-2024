@@ -2,7 +2,7 @@ package utils;
 
 import enums.ErrorType;
 
-public class Error {
+public class Error implements Comparable<Error> {
     private final ErrorType type;
     private final int lineno;
 
@@ -13,5 +13,10 @@ public class Error {
 
     public String toString() {
         return lineno + " " + type.toString() + "\n";
+    }
+
+    @Override
+    public int compareTo(Error o) {
+        return Integer.compare(this.lineno, o.lineno);
     }
 }

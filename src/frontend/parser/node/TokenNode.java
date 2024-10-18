@@ -13,6 +13,7 @@ public class TokenNode extends Node {
     public TokenNode(SyntaxCompType type, Token token) {
         super(type, new ArrayList<>());
         this.token = token;
+        super.beginLine = super.endLine = token.lineno();
     }
 
     public Token getToken() {
