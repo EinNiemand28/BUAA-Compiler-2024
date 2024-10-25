@@ -285,6 +285,233 @@ return new Token(TokenType.getTokenType(sb.toString()), sb.toString(), lineno);
 
 ## 语法分析设计
 
+### 总体概述
+
+语法分析的任务是根据词法分析得到的 token 流，识别出源程序的语法结构，即将 token 流转化为抽象语法树（每个非叶节点表示一个语法成分，每个叶节点表示一个终结符）。
+
+### 架构设计
+
+我设计了一个基本类 `Node` 用于表示抽象语法树的节点，使用带有回溯的递归下降方法不断地构建新的节点（每种语法成分都有对应的 `parse` 方法），直到构建出整个抽象语法树。
+
+构建完成后，递归地调用 `print()` 方法，以后序遍历的方式输出抽象语法树。
+
+
+```java
+public class Node {
+    protected final SyntaxCompType type;
+    protected final List<Node> children;
+    protected int beginLine;
+    protected int endLine;
+    protected int size;
+
+    public Node(SyntaxCompType type, List<Node> children) {
+        // ...
+    }
+
+    public void print() throws IOException {
+        for (Node child : children) {
+            child.print();
+        }
+        if (type != SyntaxCompType.BlockItem &&
+            type != SyntaxCompType.Decl &&
+            type != SyntaxCompType.BType) {
+            Printer.printSyntaxComp(type.toString());
+        }
+    }
+
+    // ...
+}
+```
+
+除了每种语法成分的节点类，还有一个 `TokenNode` 类，用于表示叶节点，即终结符。
+
+```java
+public class TokenNode extends Node {
+    private final Token token;
+
+    public TokenNode(SyntaxCompType type, Token token) {
+        super(type, new ArrayList<>());
+        this.token = token;
+        super.beginLine = super.endLine = token.lineno();
+    }
+
+    @Override
+    public void print() throws IOException {
+        Printer.printSyntaxComp(token.toString());
+    }
+
+    // ...
+}
+```
+
+此外，为了方便回溯，我还额外设计了一个枚举类型 `SyntaxCompType.FAIL` ，用于表示解析失败。`Node` 类的 `size` 属性表示当前节点的子节点数量，如果解析失败，unread 回溯时可以根据 `size` 的值回溯相应的子节点。
+
+最后，我将所有的语法节点类都放在了 `node` 包下，并大致分为 `declaration` 、 `expression` 、 `function` 和 `statement` 四个包。
+
+### 实现细节
+
+#### 消除左递归
+
+文法中的左递归会导致递归下降分析器陷入死循环，因此需要对文法进行一定的修改。例如，对于以下文法：
+
+```plain
+AddExp → MulExp | AddExp ('+' | '−') MulExp
+```
+
+可以将其改写为：
+
+```plain
+AddExp → MulExp { ('+' | '−') MulExp }
+``` 
+
+但是，这会导致语法树的结构发生改变。为了满足原文法的语法树结构，我在构建 `AddExp` 节点时，不断地将 `AddExp(最开始为 MulExp) ('+' | '−') MulExp` 的结构转化为新的 `AddExp` 节点。
+
+```java
+/**
+ * AddExp -> MulExp | AddExp ('+' | '−') MulExp
+ */
+private Node parseAddExp() {
+    List<Node> children = new ArrayList<>();
+    Node mulExpNode = parseMulExp();
+    if (mulExpNode.getType() == SyntaxCompType.FAIL) {
+        unread(mulExpNode.getSize()); // 回溯
+        return new Node(SyntaxCompType.FAIL, children);
+    } else { children.add(mulExpNode); }
+
+    while (true) {
+        read();
+        if (curToken.type() == TokenType.PLUS || 
+            curToken.type() == TokenType.MINU) {
+            Node addExpNode = new AddExpNode(SyntaxCompType.AddExp, new ArrayList<>(children)); // 拷贝构造
+            children.clear();
+            children.add(addExpNode);
+            children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
+            mulExpNode = parseMulExp();
+            if (mulExpNode.getType() == SyntaxCompType.FAIL) {
+                unread(mulExpNode.getSize());
+                return new Node(SyntaxCompType.FAIL, children);
+            } else { children.add(mulExpNode); }
+        } else {
+            unread();
+            break;
+        }
+    }
+    return new AddExpNode(SyntaxCompType.AddExp, children);
+}
+```
+
+#### FIRST 集合冲突
+
+在递归下降分析中，如果两个产生式的 FIRST 集合有交集，那么就会导致分析器错误地选择产生式。例如，对于以下的文法：
+
+```plain
+Stmt -> LVal '=' Exp ';'
+        | [Exp] ';'
+        | LVal '=' 'getint''('')'';'
+        | LVal '=' 'getchar''('')'';
+        | ...
+
+UnaryExp -> PrimaryExp | Ident '(' [FuncRParams] ')' | UnaryOp UnaryExp
+PrimaryExp -> '(' Exp ')' | LVal | Number | Character
+LVal -> Ident ['[' Exp ']']
+```
+为了解决这个问题，我将能“推导得更远”的产生式作为优先产生式，这样就能避免 FIRST 集合的冲突。
+
+```java
+private Node parseStmt() {
+    Node stmtNode = parseAssignStmt();
+    if (stmtNode.getType() == SyntaxCompType.FAIL) {
+        unread(stmtNode.getSize());
+    } else { return stmtNode; }
+
+    // ...
+
+    stmtNode = parseGetIntStmt();
+    if (stmtNode.getType() == SyntaxCompType.FAIL) {
+        unread(stmtNode.getSize());
+    } else { return stmtNode; }
+
+    stmtNode = parseGetCharStmt();
+    if (stmtNode.getType() == SyntaxCompType.FAIL) {
+        unread(stmtNode.getSize());
+    } else { return stmtNode; }
+
+    // ...
+
+    stmtNode = parseExpStmt();
+    if (stmtNode.getType() == SyntaxCompType.FAIL) {
+        unread(stmtNode.getSize());
+        return new Node(SyntaxCompType.FAIL, new ArrayList<>());
+    } else { return stmtNode; }
+}
+
+private Node parseUnaryExp() {
+    List<Node> children = new ArrayList<>();
+    read();
+    if (curToken.type() == TokenType.IDENFR) {
+        // ...
+    } else {
+        unread();
+    }
+    // ...
+}
+```
+
+#### 错误处理
+
+对于错误 `i, j, k` 的行号确定，我采用了以下的处理方式：
+
+```java
+if (children.isEmpty()) {
+    // ...
+} else {
+    int lineno = children.get(children.size() - 1).getEndLine();
+    // 前一个节点的结束行号
+    read();
+    if (curToken.type() != /* ... */) {
+        unread();
+        Recorder.addErrorMessage(/* ... */, lineno);
+        children.add(new TokenNode(SyntaxCompType.TOKEN, /* ... */));
+    } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
+    return new Node(/* ... */, children);
+}
+```
+
+最后需要将所有的错误信息按照行号排序输出。
+
+### 文件组织
+
+暂时如下
+
+```markdown
+├───📁 enums/
+│   ├───📄 ErrorType.java
+│   ├───📄 SyntaxCompType.java
+│   └───📄 TokenType.java
+├───📁 frontend/
+│   ├───📁 lexer/
+│   │   ├───📄 Lexer.java
+│   │   ├───📄 Token.java
+│   │   └───📄 TokenStream.java
+│   └───📁 parser/
+│       ├───📁 node/
+│       │   ├───📁 declaration/...
+│       │   ├───📁 expression/...
+│       │   ├───📁 function/...
+│       │   ├───📁 statement/...
+│       │   ├───📄 Node.java
+│       │   └───📄 TokenNode.java
+│       └───📄 Parser.java
+├───📁 utils/
+│   ├───📄 Error.java
+│   ├───📄 Printer.java
+│   └───📄 Recorder.java
+└───📄 Compiler.java
+```
+
+### 修改
+
+暂无
 
 ## 语义分析设计
 
