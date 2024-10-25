@@ -344,7 +344,9 @@ public class TokenNode extends Node {
 }
 ```
 
-此外，为了方便回溯，我还额外设计了一个枚举类型 `SyntaxCompType.FAIL` ，用于表示解析失败。`Node` 类的 `size` 属性表示当前节点的子节点数量，如果解析失败，unread 回溯时可以根据 `size` 的值回溯相应的子节点。
+此外，为了方便回溯，我还额外设计了一个枚举类型 `SyntaxCompType.FAIL` ，用于表示解析失败。`Node` 类的 `size` 属性表示当前节点的子节点数量，如果解析失败，unread 回溯时可以根据 `size` 的值回溯相应的 token 数量。
+
+```java
 
 最后，我将所有的语法节点类都放在了 `node` 包下，并大致分为 `declaration` 、 `expression` 、 `function` 和 `statement` 四个包。
 
