@@ -281,7 +281,22 @@ return new Token(TokenType.getTokenType(sb.toString()), sb.toString(), lineno);
 
 ### 修改
 
-暂无
+bug 修复：空字符串识别错误的问题
+
+```java
+else if (curChar == '\"') {
+    read();
+    while (curChar != '\"' || escape) { // 要先判断，不能用do-while
+        sb.append(curChar);
+        if (curChar == '\\') { escape = !escape; }
+        else { escape = false; }
+        // 虽然没要求转义符号的处理，但是还是写了
+        read();
+    }
+    sb.append(curChar);
+    return new Token(TokenType.STRCON, sb.toString(), lineno);
+}
+```
 
 ## 语法分析设计
 
@@ -511,7 +526,7 @@ if (children.isEmpty()) {
 
 ### 修改
 
-暂无
+bug 修复：parse 各个节点时的返回值类型写错（`Node` -> `InitValNode`）
 
 ## 语义分析设计
 

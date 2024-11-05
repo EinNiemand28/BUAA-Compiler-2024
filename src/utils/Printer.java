@@ -12,11 +12,13 @@ public class Printer {
     private static FileOutputStream lexerFile = null;
     private static FileOutputStream parserFile = null;
     private static FileOutputStream errorFile = null;
+    private static FileOutputStream symbolFile = null;
 
     public static void init() throws FileNotFoundException {
         lexerFile = new FileOutputStream("lexer.txt");
         parserFile = new FileOutputStream("parser.txt");
         errorFile = new FileOutputStream("error.txt");
+        symbolFile = new FileOutputStream("symbol.txt");
     }
 
     public static void printTokens(List<Token> tokenList) throws IOException {
@@ -33,6 +35,10 @@ public class Printer {
         parserFile.write(syntaxComp.getBytes());
     }
 
+    public static void printSymbol(String symbolText) throws IOException {
+        symbolFile.write(symbolText.getBytes());
+    }
+
     public static void printErrorMessage(Error error) throws IOException {
         errorFile.write(error.toString().getBytes());
     }
@@ -41,5 +47,6 @@ public class Printer {
         lexerFile.close();
         parserFile.close();
         errorFile.close();
+        symbolFile.close();
     }
 }

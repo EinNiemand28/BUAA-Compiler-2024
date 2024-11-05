@@ -148,7 +148,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new ConstDeclNode(SyntaxCompType.ConstDecl, children);
@@ -165,7 +165,7 @@ public class Parser {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-        return new BTypeNode(SyntaxCompType.BType, children);
+        return new BTypeNode(SyntaxCompType.BType, children, curToken.content());
     }
 
     /**
@@ -194,7 +194,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.RBRACK) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingRBRACK, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         } else { unread(); }
@@ -308,7 +308,7 @@ public class Parser {
         }
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new VarDeclNode(SyntaxCompType.VarDecl, children);
@@ -340,7 +340,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.RBRACK) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingRBRACK, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         } else { unread(); }
@@ -367,13 +367,13 @@ public class Parser {
             unread(expNode.getSize());
         } else {
             children.add(expNode);
-            return new Node(SyntaxCompType.InitVal, children);
+            return new InitValNode(SyntaxCompType.InitVal, children);
         }
 
         read();
         if (curToken.type() == TokenType.STRCON) {
             children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
-            return new Node(SyntaxCompType.InitVal, children);
+            return new InitValNode(SyntaxCompType.InitVal, children);
         } else if (curToken.type() == TokenType.LBRACE) {
             children.add(new TokenNode(SyntaxCompType.TOKEN, curToken));
         } else {
@@ -389,7 +389,7 @@ public class Parser {
                 unread();
                 return new Node(SyntaxCompType.FAIL, children);
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-            return new Node(SyntaxCompType.InitVal, children);
+            return new InitValNode(SyntaxCompType.InitVal, children);
         } else { children.add(expNode); }
         while (true) {
             read();
@@ -445,7 +445,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
@@ -484,7 +484,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
@@ -508,7 +508,7 @@ public class Parser {
             unread();
             return new Node(SyntaxCompType.FAIL, children);
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
-        return new FuncTypeNode(SyntaxCompType.FuncType, children);
+        return new FuncTypeNode(SyntaxCompType.FuncType, children, curToken.content());
     }
 
     /**
@@ -563,7 +563,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.RBRACK) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingRBRACK, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         } else { unread(); }
@@ -704,7 +704,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new AssignStmtNode(SyntaxCompType.AssignStmt, children);
@@ -734,7 +734,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.SEMICN) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
             return new ExpStmtNode(SyntaxCompType.ExpStmt, children);
@@ -782,7 +782,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
@@ -850,7 +850,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
 
@@ -880,7 +880,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new BreakStmtNode(SyntaxCompType.BreakStmt, children);
@@ -908,7 +908,7 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new ReturnStmtNode(SyntaxCompType.ReturnStmt, children);
@@ -947,14 +947,14 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         lineno = children.get(children.size() - 1).getEndLine();
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new GetIntStmtNode(SyntaxCompType.GetIntStmt, children);
@@ -994,14 +994,14 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         lineno = children.get(children.size() - 1).getEndLine();
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new GetCharStmtNode(SyntaxCompType.GetCharStmt, children);
@@ -1047,14 +1047,14 @@ public class Parser {
         read();
         if (curToken.type() != TokenType.RPARENT) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         lineno = children.get(children.size() - 1).getEndLine();
         read();
         if (curToken.type() != TokenType.SEMICN) {
             unread();
-            Recorder.addErrorMessage(ErrorType.missingSEMICN, lineno);
+            Recorder.addErrorMessage(ErrorType.MissingSEMICN, lineno);
             children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.SEMICN, ";", lineno)));
         } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         return new PrintfStmtNode(SyntaxCompType.PrintfStmt, children);
@@ -1137,7 +1137,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.RBRACK) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingRBRACK, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingRBRACK, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RBRACK, "]", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
         } else { unread(); }
@@ -1164,7 +1164,7 @@ public class Parser {
             read();
             if (curToken.type() != TokenType.RPARENT) {
                 unread();
-                Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+                Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
                 children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
             } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
             return new PrimaryExpNode(SyntaxCompType.PrimaryExp, children);
@@ -1244,7 +1244,7 @@ public class Parser {
                 read();
                 if (curToken.type() != TokenType.RPARENT) {
                     unread();
-                    Recorder.addErrorMessage(ErrorType.missingRPARENT, lineno);
+                    Recorder.addErrorMessage(ErrorType.MissingRPARENT, lineno);
                     children.add(new TokenNode(SyntaxCompType.TOKEN, new Token(TokenType.RPARENT, ")", lineno)));
                 } else { children.add(new TokenNode(SyntaxCompType.TOKEN, curToken)); }
                 return new UnaryExpNode(SyntaxCompType.UnaryExp, children);

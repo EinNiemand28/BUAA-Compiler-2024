@@ -37,8 +37,16 @@ public class Node {
         return size;
     }
 
+    public int getBeginLine() {
+        return beginLine;
+    }
+
     public int getEndLine() {
         return endLine;
+    }
+
+    public List<Node> getChildren() {
+        return children;
     }
 
     public void print() throws IOException {
@@ -49,6 +57,13 @@ public class Node {
             type != SyntaxCompType.Decl &&
             type != SyntaxCompType.BType) {
             Printer.printSyntaxComp(type.toString());
+        }
+    }
+
+    public void printCons() {
+        System.out.println(beginLine + " " + endLine + " " + type);
+        for (Node child : children) {
+            System.out.println(child.type);
         }
     }
 }

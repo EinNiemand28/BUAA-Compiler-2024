@@ -1,7 +1,9 @@
 import frontend.lexer.Lexer;
 import frontend.lexer.TokenStream;
 import frontend.parser.Parser;
+import frontend.parser.node.CompUnitNode;
 import frontend.parser.node.Node;
+import frontend.visitor.Visitor;
 import utils.Printer;
 import utils.Recorder;
 
@@ -10,7 +12,9 @@ import java.io.PushbackInputStream;
 
 public class Compiler {
     public static void main(String[] args) throws Exception {
+        // System.out.println(System.getProperty("user.dir"));
         String path = "testfile.txt";
+        // String path = "./Compiler/testfile.txt";
         PushbackInputStream input = new PushbackInputStream(new FileInputStream(path));
         Printer.init();
 
@@ -21,6 +25,7 @@ public class Compiler {
 
         Node compUnit = parser.getCompUnit();
         compUnit.print();
+        Visitor.getInstance().visit((CompUnitNode) compUnit);
         Recorder.printErrorMessages();
 
         input.close();

@@ -58,35 +58,35 @@ public class Lexer {
             return new Token(TokenType.INTCON, sb.toString(), lineno);
         } else if (curChar == '\'') {
             read();
-            do {
+            while (curChar != '\'' || escape) {
                 sb.append(curChar);
                 if (curChar == '\\') { escape = !escape; }
                 else { escape = false; }
                 read();
-            } while (curChar != '\'' || escape);
+            }
             sb.append(curChar);
             return new Token(TokenType.CHRCON, sb.toString(), lineno);
         } else if (curChar == '\"') {
             read();
-            do {
+            while (curChar != '\"' || escape) {
                 sb.append(curChar);
                 if (curChar == '\\') { escape = !escape; }
                 else { escape = false; }
                 read();
-            } while (curChar != '\"' || escape);
+            }
             sb.append(curChar);
             return new Token(TokenType.STRCON, sb.toString(), lineno);
         } else if (curChar == '&') {
             read();
             if (curChar != '&') {
-                Recorder.addErrorMessage(ErrorType.illegalSymbol, lineno);
+                Recorder.addErrorMessage(ErrorType.IllegalSymbol, lineno);
                 unread();
             }
             sb.append('&');
         } else if (curChar == '|') {
             read();
             if (curChar != '|') {
-                Recorder.addErrorMessage(ErrorType.illegalSymbol, lineno);
+                Recorder.addErrorMessage(ErrorType.IllegalSymbol, lineno);
                 unread();
             }
             sb.append('|');
