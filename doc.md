@@ -377,7 +377,7 @@ AddExp → MulExp | AddExp ('+' | '−') MulExp
 
 ```plain
 AddExp → MulExp { ('+' | '−') MulExp }
-``` 
+```
 
 但是，这会导致语法树的结构发生改变。为了满足原文法的语法树结构，我在构建 `AddExp` 节点时，不断地将 `AddExp(最开始为 MulExp) ('+' | '−') MulExp` 的结构转化为新的 `AddExp` 节点。
 
@@ -509,14 +509,19 @@ if (children.isEmpty()) {
 │   │   ├───📄 Token.java
 │   │   └───📄 TokenStream.java
 │   └───📁 parser/
-│       ├───📁 node/
-│       │   ├───📁 declaration/...
-│       │   ├───📁 expression/...
-│       │   ├───📁 function/...
-│       │   ├───📁 statement/...
-│       │   ├───📄 Node.java
-│       │   └───📄 TokenNode.java
-│       └───📄 Parser.java
+│   │   ├───📁 node/
+│   │   │   ├───📁 declaration/
+│   │   │   │   └───...
+│   │   │   ├───📁 expression/
+│   │   │   │   └───...
+│   │   │   ├───📁 function/
+│   │   │   │   └───...
+│   │   │   ├───📁 statement/
+│   │   │   │   └───...
+│   │   │   ├───📄 CompUnitNode.java
+│   │   │   ├───📄 Node.java
+│   │   │   └───📄 TokenNode.java
+│   └─────📄 Parser.java
 ├───📁 utils/
 │   ├───📄 Error.java
 │   ├───📄 Printer.java
@@ -526,12 +531,397 @@ if (children.isEmpty()) {
 
 ### 修改
 
-bug 修复：parse 各个节点时的返回值类型写错（`Node` -> `InitValNode`）
+- bug 修复：parse 各个节点时的返回值类型写错（`Node` -> `InitValNode`）
+
+- 给 `BType` 和 `FuncType` 添加了具体的类型属性
+
+    ```java
+    public class BTypeNode extends Node {
+        private String typeName;
+        public BTypeNode(SyntaxCompType type, List<Node> children, String typeName) {
+            super(type, children);
+            this.typeName = typeName;
+        }
+    
+        public String getTypeName() {
+            return typeName;
+        }
+    }
+    ```
+
+    
 
 ## 语义分析设计
 
 ### 总体概述
 
+实际上要做的就是错误处理和符号表的建立，前者依赖于后者，而后者决定了我们能否让某一处的语义跨越抽象语法树的结构、关联到需要的地方去，从而完成之后的代码生成部分。
+
+### 架构设计
+
+#### 符号表
+
+首先是符号表的设计，考虑到栈式符号表似乎是一次性的？，我选择构建树状符号表，包含以下属性：
+
+```java
+public class SymbolTable {
+    private final int id;
+    private SymbolTable preTable; // 外层作用域符号表
+    private final List<SymbolTable> subTables; // 内层作用域符号表
+    private final Map<String, Symbol> symbols;
+    private final List<Symbol> symbolList; // == symbols.values()
+    // ...
+    // 插入符号前判断当前表是否存在，查找符号时不断向外层寻找。
+}
+```
+
+其中，`Symbol` 是一个基础类，由 `VarSymbol` 和 `FuncSymbol` 继承：
+```java
+public class VarSymbol extends Symbol {
+    private final boolean isConst;
+    private final Type varType; // 包含变量名和维数
+    private static SymbolType getSymbolType(boolean isConst, String varType, int dim) { ... }
+    public VarSymbol(Token token, boolean isConst, String varType, int dim) {
+        super(token, getSymbolType(isConst, varType, dim));
+        // ...
+    }
+    // ...
+}
+
+public class FuncSymbol extends Symbol {
+    private final Type funcType;
+    private List<Type> paramTypeList; // 存储参数
+    // ...
+}
+
+public enum SymbolType {
+    ConstChar, ConstInt, ConstCharArray, ConstIntArray,
+    Char, Int, CharArray, IntArray,
+    VoidFunc, CharFunc, IntFunc;
+}
+```
+
+符号表的创建过程：
+
+1. 初始时，创建一个全局变量符号表，此时 `curTable` 指向它，然后开始遍历语法成分。
+2. 遇到变量声明语句，解析出需要的信息，填入 `curTable` 。
+3. 进入新的作用域时，生成新的符号表，将其插入 `curTable` 的子表集合中；新符号表的 `preTable` 设为 `curTable` ，此时新符号表成为 `curTable` 。
+4. 离开作用域时，通过 `preTable` 属性回溯至外层符号表，恢复 `curTable` 。
+
+#### 语法树的遍历
+
+因为语义分析的关键是跨节点的语义信息的传递，所以我选择创建一个新的类 `Visitor` 来遍历所有的 `Node` ，而不是为 `Node` 添加 `visit` 方法。
+
+```java
+public class Visitor {
+    public void visit(Node node) {
+        for (Node child : node.getChildren()) {
+            visit(child); // 注意对child进行类型转换之前，要先用 instanceof 判断
+        }
+    }
+}
+```
+
+这样信息不仅能沿着遍历顺序传递，还能**跨越**语法树的分支传播到需要的地方，而不需要经过层层调用。
+
+通过共享类作用域，符号的定义和使用都可以方便地实现。
+
+```java
+public class Visitor {
+    private final static Visitor instance = new Visitor(); // 单例模式
+    private int symbolTableNum = 1;
+    private SymbolTable curTable = null;
+    private FuncSymbol curFunc = null;
+    private int loopDepth = 0; // 检查 continue 和 break
+    private int blockDepth = 0; // 检查 return
+    private String varType = null; // 变量类型（decl -> def）
+}
+```
+
+### 实现细节
+
+#### visit 返回值
+
+首先是访问函数声明时，需要返回每个形参的类型 `Type` ，并存入该函数的参数列表中
+
+```java
+// visitFuncDef
+for (Node child : node.getChildren()) {
+    if (child instanceof FuncFParamsNode) {
+        curFunc.setParamTypeList(visitFuncFParams((FuncFParamsNode) child));
+    }
+}
+
+// visitFuncFParams
+for (Node child : node.getChildren()) {
+    if (child instanceof FuncFParamNode) {
+        Type paramType = visitFuncFParam((FuncFParamNode) child);
+        if (paramType != null) { paramTypeList.add(paramType); }
+    }
+}
+return paramTypeList;
+
+// visitFuncFParam
+return new Type(varType, dim);
+```
+
+同理，函数调用时需要判断是否匹配，也需要做同样的处理
+
+------
+
+Exp 以及其子节点的 visit 方法需要返回一个 `Type` 类型的对象，用于判断是否匹配
+
+其他几种比较简单，按照文法规则的不同情况处理即可
+
+```java
+// ...
+for (Node child : node.getChildren()) {
+    // ...
+    if (type != null && type.getTypeName().equals("int")) {
+        hasInt = true;
+    }
+}
+return new Type(hasInt ? "int" : "char", type == null ? 0 : type.getDim());
+```
+
+需要注意的是 `LVal` 的 visit 方法，需要返回一个 `VarSymbol` 类型的对象
+```java
+private VarSymbol visitLVal(LValNode node, boolean checkConst) {
+    VarSymbol var = null;
+    int dim = 0;
+    Token ident = null;
+    // ...
+    for (Node child : node.getChildren()) {
+        // 真正的维数
+        if (child instanceof ExpNode) {
+            visitExp((ExpNode) child);
+            dim--;
+        }
+    }
+    if (var != null) {
+        return new VarSymbol(ident, var.isConst(), var.getVarType().getTypeName(), dim);
+    }
+    return new VarSymbol(ident, false, "int", 0);
+}
+```
+
+#### 错误处理
+
+除 a, i, j, k 之外的错误为语义分析中需要检查的错误。
+
+```java
+public enum ErrorType {
+    IllegalSymbol("a"),
+    RedefinedName("b"),
+    UndefinedName("c"),
+    MismatchedParamNum("d"),
+    MismatchedParamType("e"),
+    MismatchedReturnStmt("f"),
+    MissingReturnStmt("g"),
+    AssignToConst("h"),
+    MissingSEMICN("i"),
+    MissingRPARENT("j"),
+    MissingRBRACK("k"),
+    MismatchedPrintfArgs("l"),
+    BreakOrContinueOutsideBlock("m"),
+    ;
+}
+```
+
+需要注意的有：
+
+- d、e 类错误 - 函数参数不匹配
+
+    一共有以下几种情况不匹配：
+
+    1. 传递数组给变量。
+
+    2. 传递变量给数组。
+
+    3. 传递 char 型数组给 int 型数组。
+
+    4. 传递 int 型数组给 char 型数组。
+
+      ```java
+      private Type visitUnaryExp(UnaryExpNode node) {
+          Type type = null;
+          FuncSymbol func = null;
+          List<Type> paramTypeList = new ArrayList<>();
+          // ...
+          boolean typeMatched = true;
+          if (func != null) {
+              if (func.getParamTypeList().size() != paramTypeList.size()) {
+                  Recorder.addErrorMessage(ErrorType.MismatchedParamNum, 
+                      node.getBeginLine());
+              } else {
+                  for (int i = 0; i < func.getParamTypeList().size(); i++) {
+                      if (!func.getParamTypeList().get(i).match(paramTypeList.get(i))) {
+                          typeMatched = false;
+                          break;
+                      }
+                  }
+              }
+          }
+          if (!typeMatched) {
+              Recorder.addErrorMessage(ErrorType.MismatchedParamType, 
+                  node.getBeginLine());
+          }
+          // ...
+      }
+      ```
+
+- g - 函数缺少 return 语句
+
+    维护块的层数 - blockDepth ，每当退出最后一个块检查是否需要且有 return 语句
+
+    ```java
+    private void visitBlock(BlockNode node) {
+        // ...
+        if (blockDepth == 1) {
+            if (curFunc != null && !curFunc.getFuncType().getTypeName().equals("void")) {
+                Node blockItem = node.getChildren().get(node.getChildren().size() - 2);
+                if (!(blockItem instanceof BlockItemNode) || !(blockItem.getChildren().get(0) instanceof ReturnStmtNode)) {
+                    Recorder.addErrorMessage(ErrorType.MissingReturnStmt, node.getChildren().get(node.getChildren().size() - 1).getEndLine());
+                }
+            }
+        }
+        // ...
+    }
+    ```
+
+- h - 修改了常量的值
+
+    只需要在 `visitLVal` 中进行处理，值得注意的是，需要排除这个 LVal 来自于 
+
+    PrimaryExp 的情况
+
+    ```java
+    private VarSymbol visitLVal(LValNode node, boolean checkConst) {
+        // ...
+        if (checkConst && var.isConst()) {
+            Recorder.addErrorMessage(ErrorType.AssignToConst, node.getBeginLine());
+        }
+        // ...
+    }
+    ```
+
+- l - printf 格式字符与表达式个数不匹配
+
+    由于只有 %d 和 %c ，且类型可以相互转换，所以只需计数即可
+
+    ```java
+    if (child instanceof TokenNode) {
+        Token token = ((TokenNode) child).getToken();
+        if (token.type() == TokenType.STRCON) {
+            String format = token.content();
+            for (int i = 0; i < format.length() - 1; i++) {
+                if (format.charAt(i) == '%' && (format.charAt(i + 1) == 'd' || format.charAt(i + 1) == 'c')) {
+                    formatCount++;
+                }
+            }
+        }
+    } else if (child instanceof ExpNode) {
+        visitExp((ExpNode) child);
+        formatCount--;
+    }
+    ```
+
+- m - 非循环块使用 break 和 continue
+
+    维护 LoopDepth ，访问 breakStmt 时判断即可
+
+    ```java
+    private void visitForLoopStmt(ForLoopStmtNode node) {
+    	loopDepth++;
+        // ...
+        loopDepth--;
+    }
+    private void visitBreakStmt(BreakStmtNode node) {
+        if (loopDepth == 0) {
+            Recorder.addErrorMessage(ErrorType.BreakOrContinueOutsideBlock, 
+                node.getBeginLine());
+        }
+    }
+    ```
+
+#### 其他
+
+由于即使函数重复定义，其中的语句也要进行检查，所以需要临时给这样的函数重新设置一个名字、且不能将其存入 `curTable` （而不是直接跳过）
+
+```java
+Symbol symbol = preTable.getSymbol(ident.content());
+if (symbol != null) {
+    Recorder.addErrorMessage(ErrorType.RedefinedName, ident.lineno());
+    curFunc = new FuncSymbol(new Token(TokenType.IDENFR, symbolTableNum + "", ident.lineno()), funcType); // 借用了symbolTableNum
+} else {
+    curFunc = new FuncSymbol(ident, funcType);
+    preTable.insertSymbol(curFunc);
+}
+```
+
+-------
+
+可以通过 `ConstExp` 的个数来判断变量的维数
+
+```java
+// visitVarDef, visitConstDef
+for (Node child : node.getChildren()) {
+    if (child instanceof ConstExpNode) {
+        dim++;
+        // ...
+    }
+}
+```
+
+### 文件组织
+
+暂时如下
+
+```markdown
+├───📁 enums/
+│   ├───📄 ErrorType.java
+│   ├───📄 SymbolType.java
+│   ├───📄 SyntaxCompType.java
+│   └───📄 TokenType.java
+├───📁 frontend/
+│   ├───📁 lexer/
+│   │   ├───📄 Lexer.java
+│   │   ├───📄 Token.java
+│   │   └───📄 TokenStream.java
+│   ├───📁 parser/
+│   │   ├───📁 node/
+│   │   │   └───...
+│   │   └───📄 Parser.java
+│   ├───📁 symbol/
+│   │   ├───📄 FuncSymbol.java
+│   │   ├───📄 Symbol.java
+│   │   ├───📄 SymbolTable.java
+│   │   ├───📄 Type.java
+│   │   └───📄 VarSymbol.java
+│   └───📁 visitor/
+│       └───📄 Visitor.java
+├───📁 utils/
+│   ├───📄 Error.java
+│   ├───📄 Printer.java
+│   └───📄 Recorder.java
+└───📄 Compiler.java
+
+```
+
+### 修改
+
+暂无
+
 ## 代码生成设计
+
+### 总体概述
+
+### 架构设计
+
+### 实现细节
+
+### 文件组织
+
+### 修改
 
 ## 代码优化设计

@@ -19,12 +19,13 @@ public class Compiler {
         Printer.init();
 
         Lexer lexer = new Lexer(input);
-        Parser parser = new Parser(new TokenStream(lexer.getTokenList()));
         Printer.printTokens(lexer.getTokenList());
-        parser.parse();
 
+        Parser parser = new Parser(new TokenStream(lexer.getTokenList()));
+        parser.parse();
         Node compUnit = parser.getCompUnit();
         compUnit.print();
+
         Visitor.getInstance().visit((CompUnitNode) compUnit);
         Recorder.printErrorMessages();
 

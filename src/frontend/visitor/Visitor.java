@@ -57,8 +57,8 @@ public class Visitor {
         SymbolTable preTable = curTable;
         curTable = new SymbolTable(symbolTableNum++, preTable);
         preTable.insertSubTable(curTable);
-        if (node.getChildren().get(0) instanceof TokenNode) {
-            curFunc = new FuncSymbol(((TokenNode) node.getChildren().get(0)).getToken(), "int");
+        if (node.getChildren().get(1) instanceof TokenNode) {
+            curFunc = new FuncSymbol(((TokenNode) node.getChildren().get(1)).getToken(), "int");
         } else { System.out.println("Error: MainFuncDefNode type error"); }
 
         for (Node child : node.getChildren()) {
@@ -67,6 +67,7 @@ public class Visitor {
             }
         }
         curTable = preTable;
+        curFunc = null;
     }
 
     private void visitDecl(DeclNode node) {
@@ -242,7 +243,7 @@ public class Visitor {
         }
 
         if (blockDepth == 1) {
-            if (!curFunc.getFuncType().getTypeName().equals("void")) {
+            if (curFunc != null && !curFunc.getFuncType().getTypeName().equals("void")) {
                 Node blockItem = node.getChildren().get(node.getChildren().size() - 2);
                 if (!(blockItem instanceof BlockItemNode) || !(blockItem.getChildren().get(0) instanceof ReturnStmtNode)) {
                     Recorder.addErrorMessage(ErrorType.MissingReturnStmt, node.getChildren().get(node.getChildren().size() - 1).getEndLine());
