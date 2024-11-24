@@ -1,4 +1,4 @@
-package enums;
+package frontend.enums;
 
 public enum SymbolType {
     ConstChar,

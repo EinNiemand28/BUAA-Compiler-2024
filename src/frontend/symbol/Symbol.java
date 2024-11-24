@@ -1,9 +1,9 @@
 package frontend.symbol;
 
-import enums.SymbolType;
+import frontend.enums.SymbolType;
 import frontend.lexer.Token;
 
-public class Symbol {
+public abstract class Symbol {
     private final Token token;
     private final SymbolType type;
 

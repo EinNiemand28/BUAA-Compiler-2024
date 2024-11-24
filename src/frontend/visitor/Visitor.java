@@ -13,8 +13,8 @@ import frontend.parser.node.expression.*;
 import frontend.parser.node.function.*;
 import frontend.parser.node.statement.*;
 
-import enums.TokenType;
-import enums.ErrorType;
+import frontend.enums.TokenType;
+import frontend.enums.ErrorType;
 import frontend.lexer.Token;
 import utils.Recorder;
 

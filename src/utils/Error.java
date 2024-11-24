@@ -1,6 +1,6 @@
 package utils;
 
-import enums.ErrorType;
+import frontend.enums.ErrorType;
 
 public class Error implements Comparable<Error> {
     private final ErrorType type;

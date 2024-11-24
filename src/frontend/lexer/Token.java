@@ -1,6 +1,6 @@
 package frontend.lexer;
 
-import enums.TokenType;
+import frontend.enums.TokenType;
 
 public record Token(TokenType type, String content, int lineno) {
 

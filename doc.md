@@ -266,7 +266,7 @@ return new Token(TokenType.getTokenType(sb.toString()), sb.toString(), lineno);
 暂时如下
 
 ```markdown
-├───📁 enums/
+├───📁 frontend.enums/
 │   ├───📄 ErrorType.java
 │   └───📄 TokenType.java
 ├───📁 frontend/
@@ -499,7 +499,7 @@ if (children.isEmpty()) {
 暂时如下
 
 ```markdown
-├───📁 enums/
+├───📁 frontend.enums/
 │   ├───📄 ErrorType.java
 │   ├───📄 SyntaxCompType.java
 │   └───📄 TokenType.java
@@ -878,7 +878,7 @@ for (Node child : node.getChildren()) {
 暂时如下
 
 ```markdown
-├───📁 enums/
+├───📁 frontend.enums/
 │   ├───📄 ErrorType.java
 │   ├───📄 SymbolType.java
 │   ├───📄 SyntaxCompType.java
@@ -918,6 +918,29 @@ for (Node child : node.getChildren()) {
 
 
 ### 架构设计
+
+| LLVM IR         | 使用方法                                                     | 简介                                                   |
+| --------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
+| `add`           | `<result> = add <ty> <op1>, <op2>`                           | `nsw` - 发生有符号溢出                                 |
+| `sub`           | `<result> = sub <ty> <op1>, <op2>`                           |                                                        |
+| `mul`           | `<result> = mul <ty> <op1>, <op2>`                           |                                                        |
+| `sdiv`          | `<result> = sdiv <ty> <op1>, <op2>`                          | 有符号除法                                             |
+| `srem`          | `<result> = srem <ty> <op1>, <op2>`                          | 有符号取余                                             |
+| `icmp`          | `<result> = icmp <cond> <ty> <op1>, <op2>`                   | 比较指令                                               |
+| `and`           | `<result> = and <ty> <op1>, <op2>`                           | 按位与                                                 |
+| `or`            | `<result> = or <ty> <op1>, <op2>`                            | 按位或                                                 |
+| `call`          | `<result> = call [ret attrs] <ty> <name>(<...args>)`         | 函数调用                                               |
+| `alloca`        | `<result> = alloca <type>`                                   | 分配内存                                               |
+| `load`          | `<result> = load <ty>, ptr <pointer>`                        | 读取内存                                               |
+| `store`         | `store <ty> <value>, ptr <pointer>`                          | 写内存                                                 |
+| `getelementptr` | `<result> = getelementptr <ty>, ptr <ptrval>{, <ty> <idx>}*` | 计算目标元素的位置                                     |
+| `phi`           | `<result> = phi [fast-math-flags] <ty> [<val0>, <label0>], ...` |                                                        |
+| `zext..to`      | `<result> = zext <ty> <value> to <ty2>`                      | 将 `ty` 的 `value` 的 type 扩充为 `ty2`（zero extend） |
+| `trunc..to`     | `<result> = trunc <ty> <value> to <ty2>`                     | 将 `ty` 的 `value` 的 type 缩减为 `ty2`（truncate）    |
+| `br`            | `br i1 <cond>, label <iftrue>, label <iffalse>` `br label <dest>` | 改变控制流                                             |
+| `ret`           | `ret <type> <value> `, `ret void`                            | 退出当前函数，并返回值                                 |
+
+
 
 ### 实现细节
 

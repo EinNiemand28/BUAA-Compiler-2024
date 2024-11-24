@@ -1,6 +1,6 @@
 package frontend.parser.node;
 
-import enums.SyntaxCompType;
+import frontend.enums.SyntaxCompType;
 
 import java.util.List;
 

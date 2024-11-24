@@ -1,7 +1,7 @@
 package frontend.lexer;
 
-import enums.ErrorType;
-import enums.TokenType;
+import frontend.enums.ErrorType;
+import frontend.enums.TokenType;
 import utils.Recorder;
 
 import java.io.IOException;

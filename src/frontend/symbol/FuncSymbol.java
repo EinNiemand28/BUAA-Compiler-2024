@@ -1,7 +1,7 @@
 package frontend.symbol;
 
 import frontend.lexer.Token;
-import enums.SymbolType;
+import frontend.enums.SymbolType;
 
 import java.util.ArrayList;
 import java.util.List;

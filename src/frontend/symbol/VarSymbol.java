@@ -1,7 +1,7 @@
 package frontend.symbol;
 
 import frontend.lexer.Token;
-import enums.SymbolType;
+import frontend.enums.SymbolType;
 
 public class VarSymbol extends Symbol {
     private final boolean isConst;

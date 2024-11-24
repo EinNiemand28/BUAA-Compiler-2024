@@ -1,6 +1,6 @@
 package utils;
 
-import enums.ErrorType;
+import frontend.enums.ErrorType;
 
 import java.io.IOException;
 import java.util.ArrayList;

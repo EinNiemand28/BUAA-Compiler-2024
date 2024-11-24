@@ -1,8 +1,8 @@
 package frontend.parser;
 
-import enums.ErrorType;
-import enums.SyntaxCompType;
-import enums.TokenType;
+import frontend.enums.ErrorType;
+import frontend.enums.SyntaxCompType;
+import frontend.enums.TokenType;
 import frontend.lexer.TokenStream;
 import frontend.lexer.Token;
 import frontend.parser.node.CompUnitNode;
