@@ -18,6 +18,16 @@ public class Type {
         return typeName;
     }
 
+    public int getBitWidth() {
+        if (typeName.equals("int")) {
+            return 32;
+        } else if (typeName.equals("char")) {
+            return 8;
+        } else {
+            return 0;
+        }
+    }
+
     public int getDim() {
         return dim;
     }

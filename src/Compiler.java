@@ -3,6 +3,7 @@ import frontend.lexer.TokenStream;
 import frontend.parser.Parser;
 import frontend.parser.node.CompUnitNode;
 import frontend.parser.node.Node;
+import frontend.symbol.SymbolTable;
 import frontend.visitor.Visitor;
 import utils.Printer;
 import utils.Recorder;
@@ -27,6 +28,11 @@ public class Compiler {
         compUnit.print();
 
         Visitor.getInstance().visit((CompUnitNode) compUnit);
+        SymbolTable symbolTable = Visitor.getInstance().getCurTable();
+        System.out.println(symbolTable.getId());
+//        if (Recorder.getErrors().isEmpty()) {
+//            Printer.printIr(null);
+//        }
         Recorder.printErrorMessages();
 
         input.close();

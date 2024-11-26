@@ -1,6 +1,8 @@
 package utils;
 
 import frontend.lexer.Token;
+import llvm.ir.IRWriter;
+import llvm.ir.Module;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -52,6 +54,11 @@ public class Printer {
 
     public static void printErrorMessage(Error error) throws IOException {
         errorFile.write(error.toString().getBytes());
+    }
+
+    public static void printIr(Module module) throws IOException {
+        IRWriter irWriter = new IRWriter(module);
+        llvmIrFile.write(irWriter.generateIr().getBytes());
     }
 
     public static void close() throws IOException {

@@ -1,23 +1,29 @@
 package llvm.value;
 
-import llvm.ir.Type;
+import llvm.ir.IRType;
+import llvm.ir.SlotTracker;
 
 import java.util.List;
 import java.util.ArrayList;
 
 public class Value {
-    private Type type;
+    private IRType IRType;
     private String name;
     private List<Use> uses;
 
-    protected Value(Type type, String name) {
-        this.type = type;
+    protected Value(IRType IRType, String name) {
+        this.IRType = IRType;
         this.name = name;
         this.uses = new ArrayList<>();
     }
 
-    public Type getType() { return type; }
-    public String getName() { return name; }
+    public IRType getType() { return IRType; }
+    public String getName() {
+        if (name == null) {
+            name = SlotTracker.getInstance().getSlot();
+        }
+        return name;
+    }
     public List<Use> getUses() { return uses; }
 
     public void addUse(Use use) {
@@ -36,6 +42,6 @@ public class Value {
 
     @Override
     public String toString() {
-        return type + " " + name;
+        return IRType + " " + name;
     }
 }

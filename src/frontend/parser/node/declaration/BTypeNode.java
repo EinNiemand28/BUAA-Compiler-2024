@@ -6,7 +6,7 @@ import frontend.parser.node.Node;
 import java.util.List;
 
 public class BTypeNode extends Node {
-    private String typeName;
+    private final String typeName;
     public BTypeNode(SyntaxCompType type, List<Node> children, String typeName) {
         super(type, children);
         this.typeName = typeName;

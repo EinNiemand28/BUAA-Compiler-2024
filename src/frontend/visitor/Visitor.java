@@ -23,6 +23,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Visitor {
+    private static class Result {
+        public Type type = null;
+        public List<Type> paramTypes = new ArrayList<>();
+        public boolean isConst = false;
+        public int constValue = 0;
+    }
+
     private final static Visitor instance = new Visitor();
     private int symbolTableNum = 1;
     private SymbolTable curTable = null;
@@ -32,23 +39,20 @@ public class Visitor {
     private String varType = null;
 
     private Visitor() {}
-
-    public static Visitor getInstance() {
-        return instance;
-    }
+    public static Visitor getInstance() { return instance; }
+    public SymbolTable getCurTable() { return curTable; }
 
     public void visit(CompUnitNode node) throws IOException {
+        if (curTable != null) { return; }
         curTable = new SymbolTable(symbolTableNum++, null);
 
-        for (Node child : node.getChildren()) {
-            if (child instanceof DeclNode) {
-                visitDecl((DeclNode) child);
-            } else if (child instanceof FuncDefNode) {
-                visitFuncDef((FuncDefNode) child);
-            } else if (child instanceof MainFuncDefNode) {
-                visitMainFuncDef((MainFuncDefNode) child);
-            }
+        for (DeclNode decl : node.getDecls()) {
+            visitDecl(decl);
         }
+        for (FuncDefNode funcDef : node.getFuncDefs()) {
+            visitFuncDef(funcDef);
+        }
+        visitMainFuncDef(node.getMainFunc());
 
         curTable.print();
     }
@@ -57,106 +61,86 @@ public class Visitor {
         SymbolTable preTable = curTable;
         curTable = new SymbolTable(symbolTableNum++, preTable);
         preTable.insertSubTable(curTable);
-        if (node.getChildren().get(1) instanceof TokenNode) {
-            curFunc = new FuncSymbol(((TokenNode) node.getChildren().get(1)).getToken(), "int");
-        } else { System.out.println("Error: MainFuncDefNode type error"); }
 
-        for (Node child : node.getChildren()) {
-            if (child instanceof BlockNode) {
-                visitBlock((BlockNode) child);
-            }
-        }
+        curFunc = new FuncSymbol(node.getIdent(), "int");
+        preTable.insertSymbol(curFunc);
+
+        visitBlock(node.getBlock());
+
         curTable = preTable;
         curFunc = null;
     }
 
     private void visitDecl(DeclNode node) {
-        Node child = node.getChildren().get(0);
-        if (child instanceof ConstDeclNode) {
-            visitConstDecl((ConstDeclNode) child);
-        } else {
-            visitVarDecl((VarDeclNode) child);
+        if (node.getConstDecl() != null) {
+            visitConstDecl(node.getConstDecl());
+        } else if (node.getVarDecl() != null) {
+            visitVarDecl(node.getVarDecl());
         }
     }
 
     private void visitConstDecl(ConstDeclNode node) {
-        if (node.getChildren().get(1) instanceof BTypeNode) {
-            varType = ((BTypeNode) node.getChildren().get(1)).getTypeName();
-        } else { System.out.println("Error: ConstDeclNode type error"); }
-        for (Node child : node.getChildren()) {
-            if (child instanceof ConstDefNode) {
-                visitConstDef((ConstDefNode) child);
-            }
+        varType = node.getBType().getTypeName();
+        for (ConstDefNode constDef : node.getConstDefs()) {
+            visitConstDef(constDef);
         }
     }
 
     private void visitConstDef(ConstDefNode node) {
-        Token ident = null;
-        if (node.getChildren().get(0) instanceof TokenNode) {
-            ident = ((TokenNode) node.getChildren().get(0)).getToken();
-        } else { System.out.println("Error: ConstDefNode type error"); }
+        Token ident = node.getIdent();
         if (curTable.contains(ident.content())) {
             Recorder.addErrorMessage(ErrorType.RedefinedName, ident.lineno());
             return;
         }
 
         int dim = 0;
-        for (Node child : node.getChildren()) {
-            if (child instanceof ConstExpNode) {
-                dim++;
-                visitConstExp((ConstExpNode) child);
-            } else if (child instanceof ConstInitValNode) {
-                visitConstInitVal((ConstInitValNode) child);
-            }
+        for (ConstExpNode constExp : node.getConstExps()) {
+            dim++;
+            visitConstExp(constExp);
+        }
+        if (node.getConstInitVal() != null) {
+            visitConstInitVal(node.getConstInitVal());
         }
         curTable.insertSymbol(new VarSymbol(ident, true, varType, dim));
     }
 
     private void visitConstInitVal(ConstInitValNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof ConstExpNode) {
-                visitConstExp((ConstExpNode) child);
+        if (node.getStringConst() == null) {
+            for (ConstExpNode constExp : node.getConstExps()) {
+                visitConstExp(constExp);
             }
         }
     }
 
     private void visitVarDecl(VarDeclNode node) {
-        if (node.getChildren().get(0) instanceof BTypeNode) {
-            varType = ((BTypeNode) node.getChildren().get(0)).getTypeName();
-        } else { System.out.println("Error: VarDeclNode type error"); }
-        for (Node child : node.getChildren()) {
-            if (child instanceof VarDefNode) {
-                visitVarDef((VarDefNode) child);
-            }
+        varType = node.getBType().getTypeName();
+        for (VarDefNode varDef : node.getVarDefs()) {
+            visitVarDef(varDef);
         }
     }
 
     private void visitVarDef(VarDefNode node) {
-        Token ident = null;
-        if (node.getChildren().get(0) instanceof TokenNode) {
-            ident = ((TokenNode) node.getChildren().get(0)).getToken();
-        } else { System.out.println("Error: VarDefNode ident error"); }
+        Token ident = node.getIdent();
         if (curTable.contains(ident.content())) {
             Recorder.addErrorMessage(ErrorType.RedefinedName, ident.lineno());
             return;
         }
 
         int dim = 0;
-        for (Node child : node.getChildren()) {
-            if (child instanceof ConstExpNode) {
-                dim++;
-                visitConstExp((ConstExpNode) child);
-            } else if (child instanceof InitValNode) {
-                visitInitVal((InitValNode) child);
-            }
+        for (ConstExpNode constExp : node.getConstExps()) {
+            dim++;
+            visitConstExp(constExp);
+        }
+        if (node.getInitVal() != null) {
+            visitInitVal(node.getInitVal());
         }
         curTable.insertSymbol(new VarSymbol(ident, false, varType, dim));
     }
 
     private void visitInitVal(InitValNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
+        if (node.getStringConst() == null) {
+            for (ExpNode exp : node.getExps()) {
+                visitExp(exp);
             }
         }
     }
@@ -166,15 +150,8 @@ public class Visitor {
         curTable = new SymbolTable(symbolTableNum++, preTable);
         preTable.insertSubTable(curTable);
 
-        String funcType = null;
-        if (node.getChildren().get(0) instanceof FuncTypeNode) {
-            funcType = ((FuncTypeNode) node.getChildren().get(0)).getTypeName();
-        } else { System.out.println("Error: FuncDefNode type error"); }
-        Token ident = null;
-        if (node.getChildren().get(1) instanceof TokenNode) {
-            ident = ((TokenNode) node.getChildren().get(1)).getToken();
-        } else { System.out.println("Error: FuncDefNode ident error"); }
-
+        String funcType = node.getFuncType().getTypeName();
+        Token ident = node.getIdent();  
         Symbol symbol = preTable.getSymbol(ident.content());
         if (symbol != null) {
             Recorder.addErrorMessage(ErrorType.RedefinedName, ident.lineno());
@@ -184,43 +161,33 @@ public class Visitor {
             preTable.insertSymbol(curFunc);
         }
 
-        for (Node child : node.getChildren()) {
-            if (child instanceof FuncFParamsNode) {
-                curFunc.setParamTypeList(visitFuncFParams((FuncFParamsNode) child));
-
-            } else if (child instanceof BlockNode) {
-                visitBlock((BlockNode) child);
-            }
+        if (node.getFuncFParams() != null) {
+            curFunc.setParamTypeList(visitFuncFParams(node.getFuncFParams()).paramTypes);
         }
+        visitBlock(node.getBlock());
         
         curFunc = null;
         curTable = preTable;
     }
 
-    private List<Type> visitFuncFParams(FuncFParamsNode node) {
-        List<Type> paramTypeList = new ArrayList<>();
-        for (Node child : node.getChildren()) {
-            if (child instanceof FuncFParamNode) {
-                Type paramType = visitFuncFParam((FuncFParamNode) child);
-                if (paramType != null) {
-                    paramTypeList.add(paramType);
-                }
+    private Result visitFuncFParams(FuncFParamsNode node) {
+        Result result = new Result();
+        for (FuncFParamNode funcFParam : node.getFuncFParams()) {
+            Type paramType = visitFuncFParam(funcFParam).type;
+            if (paramType != null) {
+                result.paramTypes.add(paramType);
             }
         }
-        return paramTypeList;
+        return result;
     }
 
-    private Type visitFuncFParam(FuncFParamNode node) {
-        if (node.getChildren().get(0) instanceof BTypeNode) {
-            varType = ((BTypeNode) node.getChildren().get(0)).getTypeName();
-        } else { System.out.println("Error: FuncFParamNode type error"); }
-        Token ident = null;
-        if (node.getChildren().get(1) instanceof TokenNode) {
-            ident = ((TokenNode) node.getChildren().get(1)).getToken();
-        } else { System.out.println("Error: FuncFParamNode ident error"); }
+    private Result visitFuncFParam(FuncFParamNode node) {
+        Result result = new Result();
+        varType = node.getBType().getTypeName();
+        Token ident = node.getIdent();
         if (curTable.contains(ident.content())) {
             Recorder.addErrorMessage(ErrorType.RedefinedName, ident.lineno());
-            return null;
+            return result;
         }
 
         int dim = 0;
@@ -231,21 +198,24 @@ public class Visitor {
         }
         curTable.insertSymbol(new VarSymbol(ident, false, varType, dim));
 
-        return new Type(varType, dim);
+        result.type = new Type(varType, dim);
+        return result;
     }
 
     private void visitBlock(BlockNode node) {
         blockDepth++;
-        for (Node child : node.getChildren()) {
-            if (child instanceof BlockItemNode) {
-                visitBlockItem((BlockItemNode) child);
-            }
+        List<BlockItemNode> blockItems = node.getBlockItems();
+        for (BlockItemNode blockItem : blockItems) {
+            visitBlockItem(blockItem);
         }
 
         if (blockDepth == 1) {
             if (curFunc != null && !curFunc.getFuncType().getTypeName().equals("void")) {
-                Node blockItem = node.getChildren().get(node.getChildren().size() - 2);
-                if (!(blockItem instanceof BlockItemNode) || !(blockItem.getChildren().get(0) instanceof ReturnStmtNode)) {
+                BlockItemNode blockItem = null;
+                if (!blockItems.isEmpty()) {
+                    blockItem = blockItems.get(blockItems.size() - 1);
+                }
+                if (blockItem == null || !(blockItem.getStmt() instanceof ReturnStmtNode)) {
                     Recorder.addErrorMessage(ErrorType.MissingReturnStmt, node.getChildren().get(node.getChildren().size() - 1).getEndLine());
                 }
             }
@@ -254,15 +224,14 @@ public class Visitor {
     }
 
     private void visitBlockItem(BlockItemNode node) {
-        Node child = node.getChildren().get(0);
-        if (child instanceof DeclNode) {
-            visitDecl((DeclNode) child);
-        } else {
-            visitStmt(child);
+        if (node.getDecl() != null) {
+            visitDecl(node.getDecl());
+        } else if (node.getStmt() != null) {
+            visitStmt(node.getStmt());
         }
     }
 
-    private void visitStmt(Node node) {
+    private void visitStmt(StmtNode node) {
         switch (node.getType()) {
             case AssignStmt -> visitAssignStmt((AssignStmtNode) node);
             case ExpStmt -> visitExpStmt((ExpStmtNode) node);
@@ -279,20 +248,13 @@ public class Visitor {
     }
 
     private void visitAssignStmt(AssignStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LValNode) {
-                visitLVal((LValNode) child, true);
-            } else if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
-            }
-        }
+        visitLVal(node.getLVal(), true);
+        visitExp(node.getExp());
     }
 
     private void visitExpStmt(ExpStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
-            }
+        if (node.getExp() != null) {
+            visitExp(node.getExp());
         }
     }
 
@@ -300,38 +262,42 @@ public class Visitor {
         SymbolTable preTable = curTable;
         curTable = new SymbolTable(symbolTableNum++, preTable);
         preTable.insertSubTable(curTable);
-        visitBlock((BlockNode) node.getChildren().get(0));
+        visitBlock(node.getBlock());
         curTable = preTable;
     }
 
     private void visitIfStmt(IfStmtNode node) {
-        for (Node child : node.getChildren()) {
-            visitStmt(child);
+        if (node.getCond() != null) {
+            visitCond(node.getCond());
+        }
+        if (node.getThenStmt() != null) {
+            visitStmt(node.getThenStmt());
+        }
+        if (node.getElseStmt() != null) {
+            visitStmt(node.getElseStmt());
         }
     }
 
     private void visitForLoopStmt(ForLoopStmtNode node) {
         loopDepth++;
-        for (Node child : node.getChildren()) {
-            if (child instanceof ForStmtNode) {
-                visitForStmt((ForStmtNode) child);
-            } else if (child instanceof CondNode) {
-                visitCond((CondNode) child);
-            } else {
-                visitStmt(child);
-            }
+        if (node.getInitStmt() != null) {
+            visitForStmt(node.getInitStmt());
+        }
+        if (node.getCondStmt() != null) {
+            visitCond(node.getCondStmt());
+        }
+        if (node.getForStmt() != null) {
+            visitForStmt(node.getForStmt());
+        }
+        if (node.getStmt() != null) {
+            visitStmt(node.getStmt());
         }
         loopDepth--;
     }
 
     private void visitForStmt(ForStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LValNode) {
-                visitLVal((LValNode) child, true);
-            } else if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
-            }
-        }
+        visitLVal(node.getLVal(), true);
+        visitExp(node.getExp());
     }
 
     private void visitBreakStmt(BreakStmtNode node) {
@@ -342,50 +308,35 @@ public class Visitor {
     }
 
     private void visitReturnStmt(ReturnStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                if (curFunc != null && curFunc.getFuncType().getTypeName().equals("void")) {
-                    Recorder.addErrorMessage(ErrorType.MismatchedReturnStmt, 
-                        node.getBeginLine());
-                }
-                visitExp((ExpNode) child);
+        if (node.getExp() != null) {
+            if (curFunc != null && curFunc.getFuncType().getTypeName().equals("void")) {
+                Recorder.addErrorMessage(ErrorType.MismatchedReturnStmt, 
+                    node.getBeginLine());
             }
+            visitExp(node.getExp());
         }
+        // no need to check return type
     }
 
     private void visitGetIntStmt(GetIntStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LValNode) {
-                visitLVal((LValNode) child, true);
-            }
-        }
+        visitLVal(node.getLVal(), true);
     }
 
     private void visitGetCharStmt(GetCharStmtNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LValNode) {
-                visitLVal((LValNode) child, true);
-            }
-        }
+        visitLVal(node.getLVal(), true);
     }
 
     private void visitPrintfStmt(PrintfStmtNode node) {
+        String format = node.getStringConst().content();
         int formatCount = 0;
-        for (Node child : node.getChildren()) {
-            if (child instanceof TokenNode) {
-                Token token = ((TokenNode) child).getToken();
-                if (token.type() == TokenType.STRCON) {
-                    String format = token.content();
-                    for (int i = 0; i < format.length() - 1; i++) {
-                        if (format.charAt(i) == '%' && (format.charAt(i + 1) == 'd' || format.charAt(i + 1) == 'c')) {
-                            formatCount++;
-                        }
-                    }
-                }
-            } else if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
-                formatCount--;
+        for (int i = 0; i < format.length() - 1; i++) {
+            if (format.charAt(i) == '%' && (format.charAt(i + 1) == 'd' || format.charAt(i + 1) == 'c')) {
+                formatCount++;
             }
+        }
+        for (ExpNode exp : node.getExps()) {
+            visitExp(exp);
+            formatCount--;
         }
         if (formatCount != 0) {
             Recorder.addErrorMessage(ErrorType.MismatchedPrintfArgs, 
@@ -393,113 +344,104 @@ public class Visitor {
         }
     }
 
-    private VarSymbol visitLVal(LValNode node, boolean checkConst) {
-        VarSymbol var = null;
+    private Result visitLVal(LValNode node, boolean checkConst) {
+        Result result = new Result();
+        Token ident = node.getIdent();
         int dim = 0;
-        Token ident = null;
-        if (node.getChildren().get(0) instanceof TokenNode) {
-            ident = ((TokenNode) node.getChildren().get(0)).getToken();
-        } else { System.out.println("Error: LValNode ident error"); }
-
-        var = (VarSymbol) curTable.getSymbol(ident.content());
+        VarSymbol var = (VarSymbol) curTable.getSymbol(ident.content());
         if (var == null) {
             Recorder.addErrorMessage(ErrorType.UndefinedName, ident.lineno());
-        } else {
-            dim = var.getVarType().getDim();
-            if (checkConst && var.isConst()) {
-                Recorder.addErrorMessage(ErrorType.AssignToConst, node.getBeginLine());
-            }
+            result.type = new Type("int", 0);
+            return result;
         }
-        // System.out.println("LValNode ident: " + ident.content());
-        // System.out.println(var);
+        if (checkConst && var.isConst()) {
+            Recorder.addErrorMessage(ErrorType.AssignToConst, node.getBeginLine());
+        }
 
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                visitExp((ExpNode) child);
-                dim--;
-            }
+        dim = var.getVarType().getDim();
+        for (ExpNode exp : node.getExps()) {
+            visitExp(exp);
+            dim--;
         }
-        if (var != null) {
-            return new VarSymbol(ident, var.isConst(), var.getVarType().getTypeName(), dim);
-        }
-        return new VarSymbol(ident, false, "int", 0);
+        result.type = new Type(var.getVarType().getTypeName(), dim);
+        return result;
     }
 
     private void visitCond(CondNode node) {
-        visitLOrExp((LOrExpNode) node.getChildren().get(0));
+        visitLOrExp(node.getLOrEXp());
     }
 
-    private Type visitExp(ExpNode node) {
-        return new Type(visitAddExp((AddExpNode) node.getChildren().get(0)));
+    private Result visitExp(ExpNode node) {
+        Result result = visitAddExp(node.getAddExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
+        }
+        return result;
     }
 
-    private Type visitAddExp(AddExpNode node) {
-        Type type = null;
-        boolean hasInt = false;
-        for (Node child : node.getChildren()) {
-            if (child instanceof AddExpNode) {
-                type = visitAddExp((AddExpNode) child);
-            } else if (child instanceof MulExpNode) {
-                type = visitMulExp((MulExpNode) child);
+    private Result visitAddExp(AddExpNode node) {
+        Token operator = node.getOperator();
+        Result result = visitMulExp(node.getMulExp());
+        if (operator != null) {
+            Result left = visitAddExp(node.getAddExp());
+            if (left.type.getTypeName().equals("int")) {
+                result.type = new Type("int", 0);
             }
-
-            if (type != null && type.getTypeName().equals("int")) {
-                hasInt = true;
+            if (result.isConst) {
+                if (left.isConst) { result.constValue += left.constValue; }
+                else { result.isConst = false; }
             }
         }
-        return new Type(hasInt ? "int" : "char", type == null ? 0 : type.getDim());
+        return result;
     }
 
-    private Type visitMulExp(MulExpNode node) {
-        Type type = null;
-        boolean hasInt = false;
-        for (Node child : node.getChildren()) {
-            if (child instanceof MulExpNode) {
-                type = visitMulExp((MulExpNode) child);
-            } else if (child instanceof UnaryExpNode) {
-                type = visitUnaryExp((UnaryExpNode) child);
+    private Result visitMulExp(MulExpNode node) {
+        Token operator = node.getOperator();
+        Result result = visitUnaryExp(node.getUnaryExp());
+        if (operator != null) {
+            Result left = visitMulExp(node.getMulExp());
+            if (left.type.getTypeName().equals("int")) {
+                result.type = new Type("int", 0);
             }
-
-            if (type != null && type.getTypeName().equals("int")) {
-                hasInt = true;
+            if (result.isConst) {
+                if (left.isConst) { result.constValue *= left.constValue; }
+                else { result.isConst = false; }
             }
         }
-        return new Type(hasInt ? "int" : "char", type == null ? 0 : type.getDim());
+        return result;
     }
 
-    private Type visitUnaryExp(UnaryExpNode node) {
-        Type type = null;
+    private Result visitUnaryExp(UnaryExpNode node) {
+        Result result = new Result();
         FuncSymbol func = null;
-        List<Type> paramTypeList = new ArrayList<>();
         
-        for (Node child : node.getChildren()) {
-            if (child instanceof UnaryExpNode) {
-                type = new Type(visitUnaryExp((UnaryExpNode) child));
-            } else if (child instanceof PrimaryExpNode) {
-                type = new Type(visitPrimaryExp((PrimaryExpNode) child));
-            } else if (child instanceof TokenNode) {
-                if (((TokenNode) child).getToken().type() == TokenType.LPARENT ||
-                    ((TokenNode) child).getToken().type() == TokenType.RPARENT) {
-                    continue;
-                }
-                Token token = ((TokenNode) child).getToken();
-                func = (FuncSymbol) curTable.getSymbol(token.content());
-                if (func == null) {
-                    Recorder.addErrorMessage(ErrorType.UndefinedName, token.lineno());
-                }
-            } else if (child instanceof FuncRParamsNode) {
-                paramTypeList = visitFuncRParams((FuncRParamsNode) child);
+        if (node.getUnaryOp() != null) {
+            result = visitUnaryExp(node.getUnaryExp());
+            if (node.getUnaryOp().getOperator().type() == TokenType.MINU) {
+                if (result.isConst) { result.constValue = -result.constValue; }
+            }
+        }
+        if (node.getPrimaryExp() != null) {
+            result = visitPrimaryExp(node.getPrimaryExp());
+        }
+        if (node.getIdent() != null) {
+            func = (FuncSymbol) curTable.getSymbol(node.getIdent().content());
+            if (func == null) {
+                Recorder.addErrorMessage(ErrorType.UndefinedName, node.getIdent().lineno());
+            }
+            if (node.getFuncRParams() != null) {
+                result = visitFuncRParams(node.getFuncRParams());
             }
         }
 
         boolean typeMatched = true;
         if (func != null) {
-            if (func.getParamTypeList().size() != paramTypeList.size()) {
+            if (func.getParamTypeList().size() != result.paramTypes.size()) {
                 Recorder.addErrorMessage(ErrorType.MismatchedParamNum, 
                     node.getBeginLine());
             } else {
                 for (int i = 0; i < func.getParamTypeList().size(); i++) {
-                    if (!func.getParamTypeList().get(i).match(paramTypeList.get(i))) {
+                    if (!func.getParamTypeList().get(i).match(result.paramTypes.get(i))) {
                         typeMatched = false;
                         break;
                     }
@@ -511,78 +453,79 @@ public class Visitor {
                 node.getBeginLine());
         }
 
-        if (func != null) {
-            return new Type(func.getFuncType());
-        } else { return type; }
+        return result;
     }
 
-    private List<Type> visitFuncRParams(FuncRParamsNode node) {
-        List<Type> paramTypeList = new ArrayList<>();
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                paramTypeList.add(new Type(visitExp((ExpNode) child)));
-            }
+    private Result visitFuncRParams(FuncRParamsNode node) {
+        Result result = new Result();
+        for (ExpNode exp : node.getExps()) {
+            result.paramTypes.add(visitExp(exp).type);
         }
-        return paramTypeList;
+        return result;
     }
 
-    private Type visitPrimaryExp(PrimaryExpNode node) {
-        Type type = null;
-        for (Node child : node.getChildren()) {
-            if (child instanceof ExpNode) {
-                type = new Type(visitExp((ExpNode) child));
-            } else if (child instanceof LValNode) {
-                type = new Type(visitLVal((LValNode) child, false).getVarType());
-            } else if (child instanceof NumberNode) {
-                type = new Type("int", 0);
-            } else if (child instanceof CharacterNode) {
-                type = new Type("char", 0);
-            }
+    private Result visitPrimaryExp(PrimaryExpNode node) {
+        if (node.getCharacter() != null) {
+            return visitCharacterNode(node.getCharacter());
+        } else if (node.getNumber() != null) {
+            return visitNumberNode(node.getNumber());
+        } else if (node.getLVal() != null) {
+            return visitLVal(node.getLVal(), false);
+        } else if (node.getExp() != null) {
+            return visitExp(node.getExp());
         }
-        return type;
+        return new Result();
+    }
+
+    private Result visitNumberNode(NumberNode node) {
+        Result result = new Result();
+        result.type = new Type("int", 0);
+        result.isConst = true;
+        result.constValue = Integer.parseInt(node.getNumber().content());
+        return result;
+    }
+
+    private Result visitCharacterNode(CharacterNode node) {
+        Result result = new Result();
+        result.type = new Type("char", 0);
+        result.isConst = true;
+        result.constValue = node.getCharacter().content().charAt(0);
+        return result;
     }
 
     private void visitLOrExp(LOrExpNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LOrExpNode) {
-                visitLOrExp((LOrExpNode) child);
-            } else if (child instanceof LAndExpNode) {
-                visitLAndExp((LAndExpNode) child);
-            }
+        Token operator = node.getOperator();
+        if (operator != null) {
+            visitLOrExp(node.getLOrExp());
         }
+        visitLAndExp(node.getLAndExp());
     }
 
     private void visitLAndExp(LAndExpNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof LAndExpNode) {
-                visitLAndExp((LAndExpNode) child);
-            } else if (child instanceof EqExpNode) {
-                visitEqExp((EqExpNode) child);
-            }
+        Token operator = node.getOperator();
+        if (operator != null) {
+            visitLAndExp(node.getLAndExp());
         }
+        visitEqExp(node.getEqExp());
     }
 
     private void visitEqExp(EqExpNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof EqExpNode) {
-                visitEqExp((EqExpNode) child);
-            } else if (child instanceof RelExpNode) {
-                visitRelExp((RelExpNode) child);
-            }
+        Token operator = node.getOperator();
+        if (operator != null) {
+            visitEqExp(node.getEqExp());
         }
+        visitRelExp(node.getRelExp());
     }
 
     private void visitRelExp(RelExpNode node) {
-        for (Node child : node.getChildren()) {
-            if (child instanceof RelExpNode) {
-                visitRelExp((RelExpNode) child);
-            } else if (child instanceof AddExpNode) {
-                visitAddExp((AddExpNode) child);
-            }
+        Token operator = node.getOperator();
+        if (operator != null) {
+            visitRelExp(node.getRelExp());
         }
+        visitAddExp(node.getAddExp());
     }
 
     private void visitConstExp(ConstExpNode node) {
-        visitAddExp((AddExpNode) node.getChildren().get(0));
+        node.setConstValue(visitAddExp(node.getAddExp()).constValue);
     }
 }
