@@ -9,18 +9,32 @@ import frontend.parser.node.TokenNode;
 import java.util.List;
 
 public class CharacterNode extends Node {
-    private Token character = null;
+    private char character = 0;
 
     public CharacterNode(SyntaxCompType type, List<Node> children) {
         super(type, children);
         for (Node child : children) {
             if (child instanceof TokenNode) {
                 if (((TokenNode) child).getToken().type() == TokenType.CHRCON) {
-                    character = ((TokenNode) child).getToken();
+                    String tmp = ((TokenNode) child).getToken().content();
+                    if (tmp.charAt(1) == '\\') {
+                        switch (tmp.charAt(2)) {
+                            case 'n' -> character = '\n';
+                            case 't' -> character = '\t';
+                            case '\\' -> character = '\\';
+                            case '\"' -> character = '\"';
+                            case '\'' -> character = '\'';
+                            default -> {}
+                        }
+                    } else if (tmp.charAt(1) == '\'') {
+                        character = 0;
+                    } else {
+                        character = tmp.charAt(1);
+                    }
                 }
             }
         }
     }
 
-    public Token getCharacter() { return character; }
+    public char getCharacter() { return character; }
 }

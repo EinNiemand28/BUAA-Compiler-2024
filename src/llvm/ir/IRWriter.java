@@ -11,12 +11,10 @@ import java.util.List;
 public class IRWriter {
     private final Module module;
     private final StringBuilder ir;
-    private final SlotTracker slotTracker;
 
     public IRWriter(Module module) {
         this.module = module;
         this.ir = new StringBuilder();
-        this.slotTracker = new SlotTracker();
     }
 
     public String generateIr() {
@@ -31,7 +29,7 @@ public class IRWriter {
         ir.append("declare i32 @getint()\n");
         ir.append("declare i32 @getchar()\n");
         ir.append("declare void @putint(i32)\n");
-        ir.append("declare void @putchar(i32)\n");
+        ir.append("declare void @putch(i32)\n");
         ir.append("declare void @putstr(i8*)\n");
     }
 
@@ -50,14 +48,14 @@ public class IRWriter {
     }
     
     private void generateFunction(Function func) {
-        slotTracker.reset();
+        SlotTracker.getInstance().reset();
         ir.append("define dso_local ").append(func.getReturnType()).
-        append(" @").append(func.getName()).append("(");
+                append(" ").append(func.getName()).append("(");
 
         List<Parameter> params = func.getParameters();
         for (int i = 0; i < params.size(); i++) {
             if (i > 0) { ir.append(", "); }
-            ir.append(params.get(i)).append(" ");
+            ir.append(params.get(i));
         }
         ir.append(") {\n");
 
@@ -69,7 +67,7 @@ public class IRWriter {
 
     private void generateBasicBlock(BasicBlock bb) {
         // only entry block now
-        ir.append(bb.getNameForLabel()).append(":\n");
+        ir.append(bb.getName().substring(1)).append(":\n");
         for (Instruction inst : bb.getInstructions()) {
             ir.append("    ").append(inst).append("\n");
         }

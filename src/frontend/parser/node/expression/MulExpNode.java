@@ -11,6 +11,8 @@ public class MulExpNode extends Node {
     private MulExpNode mulExp = null;
     private Token operator = null;
     private UnaryExpNode unaryExp = null;
+    private boolean isConst = false;
+    private int constValue = 0;
 
     public MulExpNode(SyntaxCompType type, List<Node> children) {
         super(type, children);
@@ -25,7 +27,14 @@ public class MulExpNode extends Node {
         }
     }
 
+    public void setConstValue(int value) {
+        constValue = value;
+        isConst = true;
+    }
+
     public MulExpNode getMulExp() { return mulExp; }
     public Token getOperator() { return operator; }
     public UnaryExpNode getUnaryExp() { return unaryExp; }
+    public boolean isConst() { return isConst; }
+    public int getConstValue() { return constValue; }
 }

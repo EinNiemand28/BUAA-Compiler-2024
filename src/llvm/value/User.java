@@ -8,8 +8,8 @@ import java.util.ArrayList;
 public class User extends Value {
     private final List<Use> operands;
 
-    protected User(IRType IRType, String name, int num) {
-        super(IRType, name);
+    protected User(IRType type, String name, int num) {
+        super(type, name);
         this.operands = new ArrayList<>(num);
         for (int i = 0; i < num; i++) {
             operands.add(new Use(null, this, i));

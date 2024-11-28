@@ -15,12 +15,27 @@ public class SymbolTable {
     private final Map<String, Symbol> symbols;
     private final List<Symbol> symbolList;
 
+    private int index = -1;
+
     public SymbolTable(int id, SymbolTable preTable) {
         this.id = id;
         this.preTable = preTable;
         this.subTables = new ArrayList<>();
         this.symbols = new HashMap<>();
         this.symbolList = new ArrayList<>();
+    }
+
+    public void resetWalker() { index = -1; }
+    public SymbolTable next() {
+        if (index + 1 < subTables.size()) {
+            index++;
+            return subTables.get(index);
+        }
+        if (preTable != null) {
+            index = -1;
+            return preTable;
+        }
+        return null;
     }
 
     public void insertSymbol(Symbol symbol) {
@@ -45,6 +60,17 @@ public class SymbolTable {
         }
         if (preTable != null) {
             return preTable.getSymbol(content);
+        } else {
+            return null;
+        }
+    }
+
+    public Symbol getSymbolByLine(String content, int line) {
+        if (contains(content) && symbols.get(content).getToken().lineno() <= line) {
+            return symbols.get(content);
+        }
+        if (preTable != null) {
+            return preTable.getSymbolByLine(content, line);
         } else {
             return null;
         }

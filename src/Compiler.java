@@ -5,6 +5,8 @@ import frontend.parser.node.CompUnitNode;
 import frontend.parser.node.Node;
 import frontend.symbol.SymbolTable;
 import frontend.visitor.Visitor;
+import llvm.ir.IRGenerator;
+import llvm.ir.Module;
 import utils.Printer;
 import utils.Recorder;
 
@@ -29,10 +31,15 @@ public class Compiler {
 
         Visitor.getInstance().visit((CompUnitNode) compUnit);
         SymbolTable symbolTable = Visitor.getInstance().getCurTable();
-        System.out.println(symbolTable.getId());
-//        if (Recorder.getErrors().isEmpty()) {
-//            Printer.printIr(null);
-//        }
+        symbolTable.print();
+//        System.out.println(symbolTable.getId());
+
+        if (Recorder.getErrors().isEmpty()) {
+            IRGenerator.getInstance().setSymbolTable(symbolTable);
+            IRGenerator.getInstance().visit((CompUnitNode) compUnit);
+            Module module = IRGenerator.getInstance().getIrModule();
+            Printer.printIr(module);
+        }
         Recorder.printErrorMessages();
 
         input.close();

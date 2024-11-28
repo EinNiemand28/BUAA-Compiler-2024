@@ -53,10 +53,4 @@ public class Module {
 
     public List<GlobalValue> getGlobalsValues() { return globalsValues; }
     public List<Function> getFunctions() { return functions; }
-
-    @Override
-    public String toString() {
-        // TODO
-        return null;
-    }
 }

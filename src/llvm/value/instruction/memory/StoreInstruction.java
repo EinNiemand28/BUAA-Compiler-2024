@@ -2,10 +2,11 @@ package llvm.value.instruction.memory;
 
 import llvm.value.Value;
 import llvm.value.instruction.base.MemoryInstruction;
+import llvm.ir.IRType;
 
 public class StoreInstruction extends MemoryInstruction {
     public StoreInstruction(Value value, Value pointer) {
-        super(llvm.ir.IRType.VoidIRType.getInstance(), 2);
+        super(IRType.VoidIRType.getInstance(), 2);
         setOperand(0, value);
         setOperand(1, pointer);
     }

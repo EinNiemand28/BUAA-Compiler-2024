@@ -3,9 +3,13 @@ package frontend.symbol;
 import frontend.lexer.Token;
 import frontend.enums.SymbolType;
 
+import java.util.List;
+import java.util.ArrayList;
+
 public class VarSymbol extends Symbol {
     private final boolean isConst;
     private final Type varType;
+    private final List<Integer> constValues;
 
     private static SymbolType getSymbolType(boolean isConst, String varType, int dim) {
         if (isConst) {
@@ -27,15 +31,22 @@ public class VarSymbol extends Symbol {
         }
     }
 
-    public VarSymbol(Token token, boolean isConst, String varType, int dim) {
-        super(token, getSymbolType(isConst, varType, dim));
+    public VarSymbol(Token token, boolean isConst, Type type) {
+        super(token, getSymbolType(isConst, type.getTypeName(), type.getDimSize()));
         this.isConst = isConst;
-        this.varType = new Type(varType, dim);
+        this.constValues = new ArrayList<>();
+        this.varType = new Type(type);
+    }
+
+    public void addConstValue(int value) {
+        constValues.add(value);
     }
 
     public boolean isConst() {
         return isConst;
     }
+
+    public List<Integer> getConstValues() { return constValues; }
 
     public Type getVarType() {
         return varType;

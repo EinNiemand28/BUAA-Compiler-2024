@@ -9,8 +9,8 @@ public abstract class Instruction extends User {
     private Instruction prevInst;
     private Instruction nextInst;
     
-    protected Instruction(IRType IRType, String name, int num) {
-        super(IRType, name, num);
+    protected Instruction(IRType type, String name, int num) {
+        super(type, name, num);
         this.parent = null;
         this.prevInst = null;
         this.nextInst = null;

@@ -20,7 +20,7 @@ public class FuncSymbol extends Symbol {
 
     public FuncSymbol(Token token, String funcType) {
         super(token, getSymbolType(funcType));
-        this.funcType = new Type(funcType, 0);
+        this.funcType = new Type(funcType);
         this.paramTypeList = new ArrayList<>();
     }
 

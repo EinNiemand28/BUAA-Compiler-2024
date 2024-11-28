@@ -7,19 +7,19 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class Value {
-    private IRType IRType;
+    private IRType type;
     private String name;
     private List<Use> uses;
 
     protected Value(IRType IRType, String name) {
-        this.IRType = IRType;
+        this.type = IRType;
         this.name = name;
         this.uses = new ArrayList<>();
     }
 
-    public IRType getType() { return IRType; }
+    public IRType getType() { return type; }
     public String getName() {
-        if (name == null) {
+        if (name == null || name.isEmpty()) {
             name = SlotTracker.getInstance().getSlot();
         }
         return name;
@@ -42,6 +42,6 @@ public class Value {
 
     @Override
     public String toString() {
-        return IRType + " " + name;
+        return type + " " + name;
     }
 }

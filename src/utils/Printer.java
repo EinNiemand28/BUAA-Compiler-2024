@@ -23,15 +23,6 @@ public class Printer {
         errorFile = new FileOutputStream("error.txt");
         symbolFile = new FileOutputStream("symbol.txt");
         llvmIrFile = new FileOutputStream("llvm_ir.txt");
-        try {
-            llvmIrFile.write(("declare i32 @getint()          ; 读取一个整数\n" +
-                            "declare i32 @getchar()     ; 读取一个字符\n" +
-                            "declare void @putint(i32)      ; 输出一个整数\n" +
-                            "declare void @putch(i32)       ; 输出一个字符\n" +
-                            "declare void @putstr(i8*)      ; 输出字符串\n").getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     public static void printTokens(List<Token> tokenList) throws IOException {

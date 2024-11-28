@@ -1,6 +1,7 @@
 package llvm.value.instruction.base;
 
 import llvm.value.Value;
+import llvm.ir.IRType;
 
 public class CompareInstruction extends Instruction {
     public enum Operator {
@@ -24,7 +25,7 @@ public class CompareInstruction extends Instruction {
     public final Operator operator;
 
     public CompareInstruction(Operator op, Value lhs, Value rhs) {
-        super(llvm.ir.IRType.IntegerIRType.get(1), "", 2);
+        super(IRType.IntegerIRType.get(1), "", 2);
         this.operator = op;
         setOperand(0, lhs);
         setOperand(1, rhs);

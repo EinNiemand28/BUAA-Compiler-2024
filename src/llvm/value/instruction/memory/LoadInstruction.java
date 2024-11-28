@@ -2,10 +2,11 @@ package llvm.value.instruction.memory;
 
 import llvm.value.instruction.base.MemoryInstruction;
 import llvm.value.Value;
+import llvm.ir.IRType;
 
 public class LoadInstruction extends MemoryInstruction {
     public LoadInstruction(Value pointer) {
-        super(((llvm.ir.IRType.PointerIRType)pointer.getType()).getElementType(), 2);
+        super(((IRType.PointerIRType)pointer.getType()).getElementType(), 2);
         setOperand(0, pointer);
     }
 

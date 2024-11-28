@@ -2,18 +2,19 @@ package llvm.value.instruction.terminator;
 
 import llvm.value.Value;
 import llvm.value.instruction.base.TerminatorInstruction;
+import llvm.ir.IRType;
 
 public class BranchInstruction extends TerminatorInstruction {
     private final boolean isConditional;
 
     public BranchInstruction(Value target) {
-        super(llvm.ir.IRType.VoidIRType.getInstance(), 1);
+        super(IRType.VoidIRType.getInstance(), 1);
         this.isConditional = false;
         setOperand(0, target);
     }
     
     public BranchInstruction(Value condition, Value trueTarget, Value falseTarget) {
-        super(llvm.ir.IRType.VoidIRType.getInstance(), 3);
+        super(IRType.VoidIRType.getInstance(), 3);
         this.isConditional = true;
         setOperand(0, condition);
         setOperand(1, trueTarget);

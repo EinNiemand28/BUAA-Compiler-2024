@@ -12,7 +12,7 @@ import java.util.List;
 
 public class VarDefNode extends Node {
     private Token ident = null;
-    private List<ConstExpNode> constExps = new ArrayList<>();
+    private final List<ConstExpNode> constExps = new ArrayList<>();
     private InitValNode initVal = null;
 
     public VarDefNode(SyntaxCompType type, List<Node> children) {

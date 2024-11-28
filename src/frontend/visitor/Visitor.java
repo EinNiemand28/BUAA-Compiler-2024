@@ -18,7 +18,6 @@ import frontend.enums.ErrorType;
 import frontend.lexer.Token;
 import utils.Recorder;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +27,7 @@ public class Visitor {
         public List<Type> paramTypes = new ArrayList<>();
         public boolean isConst = false;
         public int constValue = 0;
+        public List<Integer> constValues = new ArrayList<>();
     }
 
     private final static Visitor instance = new Visitor();
@@ -42,7 +42,7 @@ public class Visitor {
     public static Visitor getInstance() { return instance; }
     public SymbolTable getCurTable() { return curTable; }
 
-    public void visit(CompUnitNode node) throws IOException {
+    public void visit(CompUnitNode node) {
         if (curTable != null) { return; }
         curTable = new SymbolTable(symbolTableNum++, null);
 
@@ -53,8 +53,7 @@ public class Visitor {
             visitFuncDef(funcDef);
         }
         visitMainFuncDef(node.getMainFunc());
-
-        curTable.print();
+        // curTable.print();
     }
 
     private void visitMainFuncDef(MainFuncDefNode node) {
@@ -63,7 +62,7 @@ public class Visitor {
         preTable.insertSubTable(curTable);
 
         curFunc = new FuncSymbol(node.getIdent(), "int");
-        preTable.insertSymbol(curFunc);
+//        preTable.insertSymbol(curFunc);
 
         visitBlock(node.getBlock());
 
@@ -93,23 +92,36 @@ public class Visitor {
             return;
         }
 
-        int dim = 0;
+        Type type = new Type(varType);
         for (ConstExpNode constExp : node.getConstExps()) {
-            dim++;
-            visitConstExp(constExp);
+            type.addDim(visitConstExp(constExp).constValue);
         }
+        VarSymbol var = new VarSymbol(ident, true, type);
         if (node.getConstInitVal() != null) {
-            visitConstInitVal(node.getConstInitVal());
-        }
-        curTable.insertSymbol(new VarSymbol(ident, true, varType, dim));
-    }
-
-    private void visitConstInitVal(ConstInitValNode node) {
-        if (node.getStringConst() == null) {
-            for (ConstExpNode constExp : node.getConstExps()) {
-                visitConstExp(constExp);
+            Result result = visitConstInitVal(node.getConstInitVal());
+            for (int i = 0; i < result.constValues.size(); i++) {
+                var.addConstValue(result.constValues.get(i));
             }
         }
+        curTable.insertSymbol(var);
+    }
+
+    private Result visitConstInitVal(ConstInitValNode node) {
+        Result result = new Result();
+        result.isConst = true;
+        if (node.getConstExp() != null) {
+            result.constValues.add(visitConstExp(node.getConstExp()).constValue);
+        } else if (node.getStringConst() != null) {
+            String str = node.getStringConst();
+            for (int i = 0; i < str.length(); i++) {
+                result.constValues.add((int) str.charAt(i));
+            }
+        } else {
+            for (ConstExpNode constExp : node.getConstExps()) {
+                result.constValues.add(visitConstExp(constExp).constValue);
+            }
+        }
+        return result;
     }
 
     private void visitVarDecl(VarDeclNode node) {
@@ -126,19 +138,20 @@ public class Visitor {
             return;
         }
 
-        int dim = 0;
+        Type type = new Type(varType);
         for (ConstExpNode constExp : node.getConstExps()) {
-            dim++;
-            visitConstExp(constExp);
+            type.addDim(visitConstExp(constExp).constValue);
         }
         if (node.getInitVal() != null) {
             visitInitVal(node.getInitVal());
         }
-        curTable.insertSymbol(new VarSymbol(ident, false, varType, dim));
+        curTable.insertSymbol(new VarSymbol(ident, false, type));
     }
 
     private void visitInitVal(InitValNode node) {
-        if (node.getStringConst() == null) {
+        if (node.getExp() != null) {
+            visitExp(node.getExp());
+        } else if (node.getStringConst() == null) {
             for (ExpNode exp : node.getExps()) {
                 visitExp(exp);
             }
@@ -190,15 +203,14 @@ public class Visitor {
             return result;
         }
 
-        int dim = 0;
+        result.type = new Type(varType);
         for (Node child : node.getChildren()) {
             if (child instanceof TokenNode && ((TokenNode) child).getToken().type() == TokenType.LBRACK) {
-                dim++;
+                result.type.addDim(0);
             }
         }
-        curTable.insertSymbol(new VarSymbol(ident, false, varType, dim));
+        curTable.insertSymbol(new VarSymbol(ident, false, result.type));
 
-        result.type = new Type(varType, dim);
         return result;
     }
 
@@ -327,7 +339,7 @@ public class Visitor {
     }
 
     private void visitPrintfStmt(PrintfStmtNode node) {
-        String format = node.getStringConst().content();
+        String format = node.getStringConst();
         int formatCount = 0;
         for (int i = 0; i < format.length() - 1; i++) {
             if (format.charAt(i) == '%' && (format.charAt(i + 1) == 'd' || format.charAt(i + 1) == 'c')) {
@@ -347,23 +359,33 @@ public class Visitor {
     private Result visitLVal(LValNode node, boolean checkConst) {
         Result result = new Result();
         Token ident = node.getIdent();
-        int dim = 0;
         VarSymbol var = (VarSymbol) curTable.getSymbol(ident.content());
         if (var == null) {
             Recorder.addErrorMessage(ErrorType.UndefinedName, ident.lineno());
-            result.type = new Type("int", 0);
+            result.type = new Type("int");
             return result;
         }
         if (checkConst && var.isConst()) {
             Recorder.addErrorMessage(ErrorType.AssignToConst, node.getBeginLine());
         }
 
-        dim = var.getVarType().getDim();
+        result.type = new Type(var.getVarType());
+        int offset = 0;
         for (ExpNode exp : node.getExps()) {
-            visitExp(exp);
-            dim--;
+            Result expResult = visitExp(exp);
+            if (expResult.isConst) {
+                offset = expResult.constValue;
+            }
+            result.type.delDim();
         }
-        result.type = new Type(var.getVarType().getTypeName(), dim);
+        if (var.isConst() && result.type.getDimSize() == 0) {
+            result.isConst = true;
+            if (offset < var.getConstValues().size()) {
+                result.constValue = var.getConstValues().get(offset);
+            } else {
+                result.constValue = 0;
+            }
+        }
         return result;
     }
 
@@ -385,12 +407,21 @@ public class Visitor {
         if (operator != null) {
             Result left = visitAddExp(node.getAddExp());
             if (left.type.getTypeName().equals("int")) {
-                result.type = new Type("int", 0);
+                result.type = new Type("int");
             }
             if (result.isConst) {
-                if (left.isConst) { result.constValue += left.constValue; }
+                if (left.isConst) {
+                    switch (operator.type()) {
+                        case PLUS -> result.constValue = left.constValue + result.constValue;
+                        case MINU -> result.constValue = left.constValue - result.constValue;
+                        default -> {}
+                    }
+                }
                 else { result.isConst = false; }
             }
+        }
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
         }
         return result;
     }
@@ -401,12 +432,22 @@ public class Visitor {
         if (operator != null) {
             Result left = visitMulExp(node.getMulExp());
             if (left.type.getTypeName().equals("int")) {
-                result.type = new Type("int", 0);
+                result.type = new Type("int");
             }
             if (result.isConst) {
-                if (left.isConst) { result.constValue *= left.constValue; }
+                if (left.isConst) {
+                    switch (operator.type()) {
+                        case MULT -> result.constValue = left.constValue * result.constValue;
+                        case DIV -> result.constValue = left.constValue / result.constValue;
+                        case MOD -> result.constValue = left.constValue % result.constValue;
+                        default -> {}
+                    }
+                }
                 else { result.isConst = false; }
             }
+        }
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
         }
         return result;
     }
@@ -417,8 +458,11 @@ public class Visitor {
         
         if (node.getUnaryOp() != null) {
             result = visitUnaryExp(node.getUnaryExp());
-            if (node.getUnaryOp().getOperator().type() == TokenType.MINU) {
-                if (result.isConst) { result.constValue = -result.constValue; }
+            if (result.isConst) {
+                if (node.getUnaryOp().getOperator().type() == TokenType.MINU) {
+                    result.constValue = -result.constValue;
+                }
+                node.setConstValue(result.constValue);
             }
         }
         if (node.getPrimaryExp() != null) {
@@ -431,6 +475,9 @@ public class Visitor {
             }
             if (node.getFuncRParams() != null) {
                 result = visitFuncRParams(node.getFuncRParams());
+            }
+            if (func != null) {
+                result.type = new Type(func.getFuncType());
             }
         }
 
@@ -479,7 +526,7 @@ public class Visitor {
 
     private Result visitNumberNode(NumberNode node) {
         Result result = new Result();
-        result.type = new Type("int", 0);
+        result.type = new Type("int");
         result.isConst = true;
         result.constValue = Integer.parseInt(node.getNumber().content());
         return result;
@@ -487,9 +534,9 @@ public class Visitor {
 
     private Result visitCharacterNode(CharacterNode node) {
         Result result = new Result();
-        result.type = new Type("char", 0);
+        result.type = new Type("char");
         result.isConst = true;
-        result.constValue = node.getCharacter().content().charAt(0);
+        result.constValue = node.getCharacter();
         return result;
     }
 
@@ -525,7 +572,9 @@ public class Visitor {
         visitAddExp(node.getAddExp());
     }
 
-    private void visitConstExp(ConstExpNode node) {
-        node.setConstValue(visitAddExp(node.getAddExp()).constValue);
+    private Result visitConstExp(ConstExpNode node) {
+        Result result = visitAddExp(node.getAddExp());
+        node.setConstValue(result.constValue);
+        return result;
     }
 }

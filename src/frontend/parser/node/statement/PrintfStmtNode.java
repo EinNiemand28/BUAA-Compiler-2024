@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PrintfStmtNode extends StmtNode {
-    private Token stringConst = null;
+    private String stringConst = null;
     private final List<ExpNode> exps = new ArrayList<>();
 
     public PrintfStmtNode(SyntaxCompType type, List<Node> children) {
@@ -21,12 +21,13 @@ public class PrintfStmtNode extends StmtNode {
                 exps.add((ExpNode) child);
             } else if (child instanceof TokenNode) {
                 if (((TokenNode) child).getToken().type() == TokenType.STRCON) {
-                    stringConst = ((TokenNode) child).getToken();
+                    String tmp = ((TokenNode) child).getToken().content();
+                    stringConst = tmp.substring(1, tmp.length() - 1);
                 }
             }
         }
     }
 
     public List<ExpNode> getExps() { return exps; }
-    public Token getStringConst() { return stringConst; }
+    public String getStringConst() { return stringConst; }
 }

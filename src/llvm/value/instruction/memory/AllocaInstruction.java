@@ -6,9 +6,9 @@ import llvm.value.instruction.base.MemoryInstruction;
 public class AllocaInstruction extends MemoryInstruction {
     private final IRType allocatedIRType;
 
-    public AllocaInstruction(IRType IRType) {
-        super(llvm.ir.IRType.PointerIRType.get(IRType), 0);
-        this.allocatedIRType = IRType;
+    public AllocaInstruction(IRType type) {
+        super(IRType.PointerIRType.get(type), 0);
+        this.allocatedIRType = type;
     }
 
     public IRType getAllocatedType() { return allocatedIRType; }

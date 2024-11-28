@@ -1,22 +1,45 @@
 package llvm.value;
 
+import llvm.ir.IRGenerator;
 import llvm.ir.IRType;
 import llvm.value.constant.Constant;
+import llvm.value.constant.ConstantString;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class GlobalValue extends Value {
     private boolean isUnnamedAddr;
     private final boolean isConst;
     private Constant initializer;
     private static int count = 0;
+    public static Map<String, GlobalValue> stringPool = new HashMap<>();
 
-    public GlobalValue(IRType IRType, String name, boolean isConst) {
-        super(IRType, name);
+    public GlobalValue(IRType type, String name, boolean isConst) {
+        super(IRType.PointerIRType.get(type), name);
         this.isConst = isConst;
         this.isUnnamedAddr = false;
+        this.initializer = null;
     }
 
-    public GlobalValue(IRType IRType, boolean isConst) {
-        this(IRType, ".str" + (count++ > 0 ? count : ""), isConst);
+    private GlobalValue(IRType type, boolean isConst) {
+        this(type, ".str" + (count > 0 ? "." + count : ""), isConst);
+        count++;
+    }
+
+    public static GlobalValue createConstantString(String str, int size) {
+        ConstantString initializer = ConstantString.get(str, size);
+        if (stringPool.containsKey(initializer.getValue())) {
+            return stringPool.get(initializer.getValue());
+        }
+        IRType arrType = IRType.ArrayIRType.get(IRType.IntegerIRType.get(8), initializer.getSize());
+        GlobalValue strCon = new GlobalValue(arrType, true);
+
+        strCon.isUnnamedAddr = true;
+        strCon.initializer = initializer;
+        IRGenerator.getInstance().getIrModule().addGlobalValue(strCon);
+        stringPool.put(initializer.getValue(), strCon);
+        return strCon;
     }
 
     public void setInitializer(Constant initializer) { this.initializer = initializer; }
@@ -29,13 +52,13 @@ public class GlobalValue extends Value {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("@").append(getName()).append(" = ");
+        sb.append(getName()).append(" = ");
         if (isUnnamedAddr) { sb.append("private unnamed_addr "); }
-        else { sb.append("dso_local"); }
+        else { sb.append("dso_local "); }
         if (isConst) { sb.append("constant "); }
         else { sb.append("global "); }
 
-        sb.append(getType()).append(" ");
+        sb.append(((IRType.PointerIRType) getType()).getElementType()).append(" ");
 
         if (initializer != null) { sb.append(initializer); }
         else { sb.append("zeroinitializer"); }

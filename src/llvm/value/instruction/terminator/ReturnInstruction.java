@@ -2,10 +2,11 @@ package llvm.value.instruction.terminator;
 
 import llvm.value.Value;
 import llvm.value.instruction.base.TerminatorInstruction;
+import llvm.ir.IRType;
 
 public class ReturnInstruction extends TerminatorInstruction {
     public ReturnInstruction() {
-        super(llvm.ir.IRType.VoidIRType.getInstance(), 0);
+        super(IRType.VoidIRType.getInstance(), 0);
     }
 
     public ReturnInstruction(Value returnValue) {

@@ -15,6 +15,8 @@ public class UnaryExpNode extends Node {
     private UnaryOpNode unaryOp = null;
     private Token ident = null;
     private FuncRParamsNode funcRParams = null;
+    private boolean isConst = false;
+    private int constValue = 0;
 
     public UnaryExpNode(SyntaxCompType type, List<Node> children) {
         super(type, children);
@@ -35,9 +37,16 @@ public class UnaryExpNode extends Node {
         }
     }
 
+    public void setConstValue(int value) {
+        constValue = value;
+        isConst = true;
+    }
+
     public PrimaryExpNode getPrimaryExp() { return primaryExp; }
     public UnaryExpNode getUnaryExp() { return unaryExp; }
     public UnaryOpNode getUnaryOp() { return unaryOp; }
     public FuncRParamsNode getFuncRParams() { return funcRParams; }
     public Token getIdent() { return ident; }
+    public int getConstValue() { return constValue; }
+    public boolean isConst() { return isConst; }
 }

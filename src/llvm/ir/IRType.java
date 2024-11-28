@@ -1,6 +1,7 @@
 package llvm.ir;
 
 import java.util.List;
+import java.util.Objects;
 
 public abstract class IRType {
     public enum TypeID {
@@ -27,20 +28,24 @@ public abstract class IRType {
     public boolean isPointerTy() { return typeID == TypeID.PointerTyID; }
     public boolean isFunctionTy() { return typeID == TypeID.FunctionTyID; }
 
-    public static IRType convert(String type, int dim, boolean isFunction) {
-        IRType irType = null;
+    public static IRType convert(String type, List<Integer> dims) {
+        IRType basType = null;
         if (type.equals("int")) {
-            irType = IntegerIRType.get(32);
+            basType = IntegerIRType.get(32);
         } else if (type.equals("char")) {
-            irType = IntegerIRType.get(8);
+            basType = IntegerIRType.get(8);
         } else if (type.equals("void")) {
-            irType = VoidIRType.getInstance();
+            basType = VoidIRType.getInstance();
         }
-        if (dim > 0) {
-            irType = ArrayIRType.get(irType, dim);
-        }
-        if (isFunction) {
-            irType = FunctionIRType.get(irType);
+
+        IRType irType = basType;
+        for (int i = dims.size() - 1; i >= 0; i--) {
+            int dim = dims.get(i);
+            if (dim == 0) {
+                irType = PointerIRType.get(irType);
+            } else {
+                irType = ArrayIRType.get(irType, dim);
+            }
         }
         return irType;
     }
@@ -126,24 +131,28 @@ public abstract class IRType {
 
         @Override
         public String toString() { return elemenIRType + "*"; }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o instanceof PointerIRType) {
+                return elemenIRType.equals(((PointerIRType) o).elemenIRType);
+            }
+            return false;
+        }
     }
 
     public static class FunctionIRType extends IRType {
         private final IRType returnIRType;
-        private List<IRType> paramIRTypes;
+        private final List<IRType> paramIRTypes;
         
-        private FunctionIRType(IRType returnIRType) {
+        private FunctionIRType(IRType returnIRType, List<IRType> paramIRTypes) {
             super(TypeID.FunctionTyID);
             this.returnIRType = returnIRType;
-            this.paramIRTypes = null;
-        }
-
-        public static FunctionIRType get(IRType returnIRType) {
-            return new FunctionIRType(returnIRType);
-        }
-
-        public void setParamIRTypes(List<IRType> paramIRTypes) {
             this.paramIRTypes = paramIRTypes;
+        }
+
+        public static FunctionIRType get(IRType returnIRType, List<IRType> paramIRTypes) {
+            return new FunctionIRType(returnIRType, paramIRTypes);
         }
 
         public IRType getReturnType() { return returnIRType; }
