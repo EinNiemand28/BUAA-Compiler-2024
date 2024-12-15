@@ -7,6 +7,7 @@ public class UnaryInstruction extends Instruction {
     public enum Operator {
         ZExt("zext"),
         Trunc("trunc"),
+        SExt("sext"),
         ;
 
         private final String name;

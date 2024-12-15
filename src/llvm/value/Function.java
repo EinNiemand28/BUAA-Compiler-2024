@@ -1,6 +1,7 @@
 package llvm.value;
 
 import llvm.ir.IRType;
+import llvm.value.instruction.terminator.ReturnInstruction;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ public class Function extends Value {
     private final List<BasicBlock> basicBlocks;
     private final List<Parameter> parameters;
     private final BasicBlock entryBlock;
+    private BasicBlock exitBlock;
     private boolean hasReturn;
 
     public static Function GETINT;
@@ -44,17 +46,35 @@ public class Function extends Value {
         super(type, name);
         this.basicBlocks = new ArrayList<>();
         this.parameters = new ArrayList<>();
-
-        if (!type.isFunctionTy()) {
-            throw new IllegalArgumentException("not a function type");
-        }
+        this.hasReturn = false;
 
         List<IRType> paramIRTypes = ((IRType.FunctionIRType) type).getParamTypes();
         for (int i = 0; i < paramIRTypes.size(); i++) {
             this.parameters.add(new Parameter(paramIRTypes.get(i), "", i, this));
         }
-        this.entryBlock = new BasicBlock("", this);
-        this.hasReturn = false;
+
+        this.entryBlock = new BasicBlock("entry", this);
+        this.exitBlock = null;
+    }
+
+    public BasicBlock createBasicBlock() {
+        BasicBlock bb = new BasicBlock("", this);
+        return bb;
+    }
+
+    public void removeBasicBlock(BasicBlock bb) {
+        for (BasicBlock pred : new ArrayList<>(bb.getPredecessors())) {
+            bb.removePredecessor(pred);
+        }
+        for (BasicBlock succ : new ArrayList<>(bb.getSuccessors())) {
+            bb.removeSuccessor(succ);
+        }
+        
+        basicBlocks.remove(bb);
+        
+        if (bb == exitBlock) {
+            exitBlock = null;
+        }
     }
 
     public void addBasicBlock(BasicBlock bb) {
@@ -64,10 +84,40 @@ public class Function extends Value {
         basicBlocks.add(bb);
     }
 
-    public void setHasReturn(boolean hasReturn) { this.hasReturn = hasReturn; }
+    public void buildCFG() {
+        for (BasicBlock bb : basicBlocks) {
+            bb.getPredecessors().clear();
+            bb.getSuccessors().clear();
+        }
+
+        for (BasicBlock bb : basicBlocks) {
+            if (bb.hasTerminator()) {
+                bb.getTerminator().buildCFG();
+            }
+        }
+    }
+
+    public BasicBlock getExitBlock() {
+        if (exitBlock == null) {
+            for (BasicBlock bb : basicBlocks) {
+                if (bb.hasTerminator() && bb.getTerminator() instanceof ReturnInstruction) {
+                    exitBlock = bb;
+                    break;
+                }
+            }
+        }
+        return exitBlock;
+    }
+
+    public void setExitBlock(BasicBlock bb) {
+        this.exitBlock = bb;
+    }
+
+    public void setHasReturn(boolean hasReturn) { 
+        this.hasReturn = hasReturn; 
+    }
 
     public boolean hasReturn() { return hasReturn; }
-
     public List<BasicBlock> getBasicBlocks() { return basicBlocks; }
     public List<Parameter> getParameters() { return parameters; }
     public BasicBlock getEntryBlock() { return entryBlock; }

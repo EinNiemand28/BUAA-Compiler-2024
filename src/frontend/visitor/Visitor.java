@@ -390,7 +390,10 @@ public class Visitor {
     }
 
     private void visitCond(CondNode node) {
-        visitLOrExp(node.getLOrEXp());
+        Result result = visitLOrExp(node.getLOrExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
+        }
     }
 
     private Result visitExp(ExpNode node) {
@@ -461,6 +464,8 @@ public class Visitor {
             if (result.isConst) {
                 if (node.getUnaryOp().getOperator().type() == TokenType.MINU) {
                     result.constValue = -result.constValue;
+                } else if (node.getUnaryOp().getOperator().type() == TokenType.NOT) {
+                    result.constValue = result.constValue == 0 ? 1 : 0;
                 }
                 node.setConstValue(result.constValue);
             }
@@ -540,36 +545,84 @@ public class Visitor {
         return result;
     }
 
-    private void visitLOrExp(LOrExpNode node) {
+    private Result visitLOrExp(LOrExpNode node) {
         Token operator = node.getOperator();
+        Result result = visitLAndExp(node.getLAndExp());
         if (operator != null) {
-            visitLOrExp(node.getLOrExp());
+            Result left = visitLOrExp(node.getLOrExp());
+            if (left.isConst) {
+                if (left.constValue == 1) {
+                    result.constValue = 1;
+                    result.isConst = true;
+                }
+            }
         }
-        visitLAndExp(node.getLAndExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
+        }
+        return result;
     }
 
-    private void visitLAndExp(LAndExpNode node) {
+    private Result visitLAndExp(LAndExpNode node) {
         Token operator = node.getOperator();
+        Result result = visitEqExp(node.getEqExp());
         if (operator != null) {
-            visitLAndExp(node.getLAndExp());
+            Result left = visitLAndExp(node.getLAndExp());
+            if (left.isConst) {
+                if (left.constValue == 0) {
+                    result.constValue = 0;
+                    result.isConst = true;
+                }
+            }
         }
-        visitEqExp(node.getEqExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
+        }
+        return result;
     }
 
-    private void visitEqExp(EqExpNode node) {
+    private Result visitEqExp(EqExpNode node) {
         Token operator = node.getOperator();
+        Result result = visitRelExp(node.getRelExp());
         if (operator != null) {
-            visitEqExp(node.getEqExp());
+            Result left = visitEqExp(node.getEqExp());
+            if (result.isConst) {
+                if (left.isConst) {
+                    switch (operator.type()) {
+                        case EQL -> result.constValue = left.constValue == result.constValue ? 1 : 0;
+                        case NEQ -> result.constValue = left.constValue != result.constValue ? 1 : 0;
+                        default -> {}
+                    }
+                } else { result.isConst = false; }
+            }
         }
-        visitRelExp(node.getRelExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue > 0 ? 1 : 0);
+        }
+        return result;
     }
 
-    private void visitRelExp(RelExpNode node) {
+    private Result visitRelExp(RelExpNode node) {
         Token operator = node.getOperator();
+        Result result = visitAddExp(node.getAddExp());
         if (operator != null) {
-            visitRelExp(node.getRelExp());
+            Result left = visitRelExp(node.getRelExp());
+            if (result.isConst) {
+                if (left.isConst) {
+                    switch (operator.type()) {
+                        case GEQ -> result.constValue = left.constValue >= result.constValue ? 1 : 0;
+                        case LEQ -> result.constValue = left.constValue <= result.constValue ? 1 : 0;
+                        case GRE -> result.constValue = left.constValue > result.constValue ? 1 : 0;
+                        case LSS -> result.constValue = left.constValue < result.constValue ? 1 : 0;
+                        default -> {}
+                    }
+                } else { result.isConst = false; }
+            }
         }
-        visitAddExp(node.getAddExp());
+        if (result.isConst) {
+            node.setConstValue(result.constValue);
+        }
+        return result;
     }
 
     private Result visitConstExp(ConstExpNode node) {

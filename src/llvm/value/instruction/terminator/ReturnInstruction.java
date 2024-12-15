@@ -1,17 +1,21 @@
 package llvm.value.instruction.terminator;
 
 import llvm.value.Value;
+import llvm.value.BasicBlock;
 import llvm.value.instruction.base.TerminatorInstruction;
 import llvm.ir.IRType;
+import java.util.List;
+import java.util.ArrayList;
+
 
 public class ReturnInstruction extends TerminatorInstruction {
     public ReturnInstruction() {
         super(IRType.VoidIRType.getInstance(), 0);
     }
 
-    public ReturnInstruction(Value returnValue) {
-        super(returnValue.getType(), 1);
-        setOperand(0, returnValue);
+    public ReturnInstruction(Value value) {
+        super(value.getType(), 1);
+        setOperand(0, value);
     }
 
     public boolean hasReturnValue() {
@@ -19,7 +23,24 @@ public class ReturnInstruction extends TerminatorInstruction {
     }
 
     public Value getReturnValue() {
-        return getOperand(0);
+        return hasReturnValue() ? getOperand(0) : null;
+    }
+
+    public IRType getReturnType() {
+        return hasReturnValue() ? getReturnValue().getType() : IRType.VoidIRType.getInstance();
+    }
+
+    @Override
+    public void buildCFG() {
+        BasicBlock currentBB = getParent();
+        if (currentBB != null && currentBB.getParent() != null) {
+            currentBB.getParent().setExitBlock(currentBB);
+        }
+    }
+
+    @Override
+    public List<BasicBlock> getSuccessors() {
+        return new ArrayList<>();
     }
 
     @Override
@@ -29,13 +50,13 @@ public class ReturnInstruction extends TerminatorInstruction {
 
     @Override
     public String toString() {
+        StringBuilder sb = new StringBuilder(getInstructionName());
         if (hasReturnValue()) {
-            return String.format("%s %s %s", 
-            getInstructionName(), getReturnValue().getType(), 
-            getReturnValue().getName());
+            sb.append(" ").append(getReturnValue().getType())
+            .append(" ").append(getReturnValue().getName());
         } else {
-            return String.format("%s %s", 
-            getInstructionName(), getType());
+            sb.append(" void");
         }
+        return sb.toString();
     }
 }

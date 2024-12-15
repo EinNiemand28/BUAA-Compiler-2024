@@ -12,14 +12,12 @@ import llvm.value.constant.Constant;
 import llvm.value.constant.ConstantArray;
 import llvm.value.constant.ConstantInt;
 import llvm.value.constant.ConstantString;
-import llvm.value.instruction.base.BinaryInstruction;
-import llvm.value.instruction.base.CallInstruction;
-import llvm.value.instruction.base.Instruction;
-import llvm.value.instruction.base.UnaryInstruction;
+import llvm.value.instruction.base.*;
 import llvm.value.instruction.memory.AllocaInstruction;
 import llvm.value.instruction.memory.GetElementPtrInstruction;
 import llvm.value.instruction.memory.LoadInstruction;
 import llvm.value.instruction.memory.StoreInstruction;
+import llvm.value.instruction.terminator.BranchInstruction;
 import llvm.value.instruction.terminator.ReturnInstruction;
 
 import java.util.ArrayList;
@@ -116,7 +114,8 @@ public class IRGenerator {
             var.setValue(global);
         } else {
             Instruction alloc = new AllocaInstruction(type);
-            curBasicBlock.insertInstruction(alloc, curBasicBlock.getAllocNum());
+            curFunction.getEntryBlock().insertInstruction(alloc, curFunction.getEntryBlock().getAllocNum());
+            // curBasicBlock.insertInstruction(alloc, curBasicBlock.getAllocNum());
             var.setValue(alloc);
             
             if (init.value instanceof ConstantInt) {
@@ -226,7 +225,8 @@ public class IRGenerator {
             var.setValue(global);
         } else {
             Instruction alloc = new AllocaInstruction(type);
-            curBasicBlock.insertInstruction(alloc, curBasicBlock.getAllocNum());
+            curFunction.getEntryBlock().insertInstruction(alloc, curFunction.getEntryBlock().getAllocNum());
+            // curBasicBlock.insertInstruction(alloc, curBasicBlock.getAllocNum());
             var.setValue(alloc);
 
             if (node.getInitVal() != null) {
@@ -296,7 +296,7 @@ public class IRGenerator {
                         );
                     } else {
                         cast = new UnaryInstruction(
-                                UnaryInstruction.Operator.ZExt,
+                                UnaryInstruction.Operator.SExt,
                                 result.value, elementType
                         );
                     }
@@ -330,7 +330,7 @@ public class IRGenerator {
                             );
                         } else {
                             cast = new UnaryInstruction(
-                                    UnaryInstruction.Operator.ZExt,
+                                    UnaryInstruction.Operator.SExt,
                                     expResult.value, elementType
                             );
                         }
@@ -347,9 +347,17 @@ public class IRGenerator {
 
     private void visitFuncDef(FuncDefNode node) {
         FuncSymbol func = (FuncSymbol) curTable.getSymbolByLine(node.getIdent().content(), node.getIdent().lineno());
+        // System.out.println(func.getFuncType().getTypeName());
+        // for (int dim : func.getFuncType().getDims()) {
+        //     System.out.println(dim);
+        // }
         IRType retType = IRType.convert(func.getFuncType().getTypeName(), func.getFuncType().getDims());
         ArrayList<IRType> paramTypes = new ArrayList<>();
         for (Type type : func.getParamTypeList()) {
+            // System.out.println(type.getTypeName() + " " + type.getDims().size());
+            // for (int dim : type.getDims()) {
+            //     System.out.println(dim);
+            // }
             paramTypes.add(IRType.convert(type.getTypeName(), type.getDims()));
         }
         IRType funcType = IRType.FunctionIRType.get(retType, paramTypes);
@@ -431,7 +439,7 @@ public class IRGenerator {
             Instruction cast;
             if (varType.equals(IRType.IntegerIRType.get(32))) {
                 cast = new UnaryInstruction(
-                    UnaryInstruction.Operator.ZExt,
+                    UnaryInstruction.Operator.SExt,
                     rVal.value,
                     IRType.IntegerIRType.get(32));
             } else {
@@ -460,7 +468,57 @@ public class IRGenerator {
     }
 
     private void visitIfStmt(IfStmtNode node) {
-        // tbd
+        Result cond = visitCond(node.getCond());
+        for (Value value : cond.values) {
+            BasicBlock bb = (BasicBlock) value;
+            if (bb.getTerminator() instanceof BranchInstruction) {
+                BranchInstruction br = (BranchInstruction) bb.getTerminator();
+                if (br.isConditional()) {
+                    if (br.getTrueTarget() == null) {
+                        br.setTrueTarget(curBasicBlock);
+                    }
+                } else {
+                    LOrExpNode lOrExp = node.getCond().getLOrExp();
+                    if (lOrExp.isConst() && lOrExp.getConstValue() == 1) {
+                        br.setTarget(curBasicBlock);
+                    }
+                }
+            }
+        }
+        BasicBlock thenBB = curBasicBlock;
+        BasicBlock elseBB = null;
+        visitStmt(node.getThenStmt());
+        if (node.getElseStmt() != null) {
+            System.out.println("else");
+            elseBB = curFunction.createBasicBlock();
+            curBasicBlock = elseBB;
+            visitStmt(node.getElseStmt());
+        }
+
+        curBasicBlock = curFunction.createBasicBlock();
+        TerminatorInstruction terminator = new BranchInstruction(curBasicBlock);
+        BasicBlock target = curBasicBlock;
+        thenBB.setTerminator(terminator);
+        if (elseBB != null) {
+            elseBB.setTerminator(terminator);
+            target = elseBB;
+        }
+        for (Value value : cond.values) {
+            BasicBlock bb = (BasicBlock) value;
+            if (bb.getTerminator() instanceof BranchInstruction) {
+                BranchInstruction br = (BranchInstruction) bb.getTerminator();
+                if (br.isConditional()) {
+                    if (br.getFalseTarget() == null) {
+                        br.setFalseTarget(target);
+                    }
+                } else {
+                    LOrExpNode lOrExp = node.getCond().getLOrExp();
+                    if (lOrExp.isConst() && lOrExp.getConstValue() == 0) {
+                        br.setTarget(target);
+                    }
+                }
+            }
+        }
     }
 
     private void visitForLoopStmt(ForLoopStmtNode node) {
@@ -486,7 +544,7 @@ public class IRGenerator {
                 Instruction cast;
                 if (retType.equals(IRType.IntegerIRType.get(32))) {
                     cast = new UnaryInstruction(
-                        UnaryInstruction.Operator.ZExt,
+                        UnaryInstruction.Operator.SExt,
                         retValue.value,
                         IRType.IntegerIRType.get(32));
                 } else {
@@ -530,37 +588,46 @@ public class IRGenerator {
         List<ExpNode> params = node.getExps();
         String format = node.getStringConst();
 
-        String[] parts = format.split("%d|%c");
-        Pattern pattern = Pattern.compile("%[d|c]");
+        Pattern pattern = Pattern.compile("%[dc]");
         Matcher matcher = pattern.matcher(format);
         int paramIndex = 0;
+        int lastEnd = 0;
 
-        for (String part : parts) {
-            if (!part.isEmpty()) {
+        while (matcher.find()) {
+            if (matcher.start() > lastEnd) {
+                String part = format.substring(lastEnd, matcher.start());
                 GlobalValue strCon = GlobalValue.createConstantString(part, -1);
                 Instruction gep = new GetElementPtrInstruction(strCon, List.of(ConstantInt.get(32, 0), ConstantInt.get(32, 0)));
                 curBasicBlock.addInstruction(gep);
                 Instruction call = new CallInstruction(Function.PUTSTR, List.of(gep));
                 curBasicBlock.addInstruction(call);
             }
-            if (matcher.find()) {
-                String match = matcher.group();
-                Result param = visitExp(params.get(paramIndex++));
+            
+            String part = matcher.group();
+            Result param = visitExp(params.get(paramIndex++));
 
-                if (param.value.getType().equals(IRType.IntegerIRType.get(8))) {
-                    Instruction zext = new UnaryInstruction(
-                            UnaryInstruction.Operator.ZExt, param.value, IRType.IntegerIRType.get(32));
-                    curBasicBlock.addInstruction(zext);
-                    param.value = zext;
-                }
-                if (match.equals("%d")) {
-                    curBasicBlock.addInstruction(new CallInstruction(Function.PUTINT, List.of(param.value)));
-                } else {
-                    curBasicBlock.addInstruction(new CallInstruction(Function.PUTCH, List.of(param.value)));
-                }
+            if (param.value.getType().equals(IRType.IntegerIRType.get(8))) {
+                Instruction sext = new UnaryInstruction(
+                        UnaryInstruction.Operator.SExt, param.value, IRType.IntegerIRType.get(32));
+                curBasicBlock.addInstruction(sext);
+                param.value = sext;
             }
-        }
+            if (part.equals("%d")) {
+                curBasicBlock.addInstruction(new CallInstruction(Function.PUTINT, List.of(param.value)));
+            } else {
+                curBasicBlock.addInstruction(new CallInstruction(Function.PUTCH, List.of(param.value)));
+            }
 
+            lastEnd = matcher.end();
+        }
+        if (lastEnd < format.length()) {
+            String part = format.substring(lastEnd);
+            GlobalValue strCon = GlobalValue.createConstantString(part, -1);
+            Instruction gep = new GetElementPtrInstruction(strCon, List.of(ConstantInt.get(32, 0), ConstantInt.get(32, 0)));
+            curBasicBlock.addInstruction(gep);
+            Instruction call = new CallInstruction(Function.PUTSTR, List.of(gep));
+            curBasicBlock.addInstruction(call);
+        }
     }
 
     private Result visitLVal(LValNode node, boolean isLeft) {
@@ -568,7 +635,7 @@ public class IRGenerator {
         String ident = node.getIdent().content();
         VarSymbol var = (VarSymbol) curTable.getSymbolByLine(ident, node.getIdent().lineno());
         Value baseAddr = var.getValue();
-
+        // System.out.println(node.getIdent().content() + " " + node.getIdent().lineno());
         if (!node.getExps().isEmpty()) {
             if (baseAddr.getType().isPointerTy() &&
                     ((IRType.PointerIRType) baseAddr.getType()).getElementType().isPointerTy()) {
@@ -596,7 +663,7 @@ public class IRGenerator {
                 baseAddr = gep;
             }
         } else if (var.getVarType().getDimSize() > 0) {
-            if (!isLeft) {
+            if (!isLeft && !((IRType.PointerIRType) baseAddr.getType()).getElementType().isPointerTy()) {
                 List<Value> indices = List.of(ConstantInt.get(32, 0), ConstantInt.get(32,0));
                 Instruction gep = new GetElementPtrInstruction(baseAddr, indices);
                 curBasicBlock.addInstruction(gep);
@@ -615,24 +682,176 @@ public class IRGenerator {
         return result;
     }
 
-    private void visitCond(CondNode node) {
-
+    private Result visitCond(CondNode node) {
+        // reset blocks' terminator.target (values)
+        return visitLOrExp(node.getLOrExp());
     }
 
-    private void visitLOrExp(LOrExpNode node) {
+    private Result visitLOrExp(LOrExpNode node) {
+        Result result = new Result();
 
+        List<Result> lAndResults = new ArrayList<>();
+        for (LAndExpNode lAndExp : node.getLAndExps()) {
+            if (lAndExp.isConst()) {
+                if (lAndExp.getConstValue() == 1) {
+                    Instruction br = new BranchInstruction(null);
+                    curBasicBlock.addInstruction(br);
+                    result.values.add(curBasicBlock);
+                    curBasicBlock = curFunction.createBasicBlock();
+                    break;
+                }
+            }
+            lAndResults.add(visitLAndExp(lAndExp));
+        }
+
+        for (int i = 0; i < lAndResults.size(); i++) {
+            Value lastValue = lAndResults.get(i).values.get(lAndResults.get(i).values.size() - 1);
+            BranchInstruction br = (BranchInstruction) ((BasicBlock) lastValue).getTerminator();
+            if (br.isConditional()) { br.setTrueTarget(null); }
+            if (i == lAndResults.size() - 1) {
+                result.values.addAll(lAndResults.get(i).values);
+            } else {
+                BasicBlock nextLOrBlock = (BasicBlock) lAndResults.get(i + 1).values.get(0);
+                for (Value value : lAndResults.get(i).values) {
+                    BasicBlock bb = (BasicBlock) value;
+                    br = (BranchInstruction) bb.getTerminator();
+                    if (br.isConditional()) { br.setFalseTarget(nextLOrBlock); }
+                    else if (br.getTarget() == null) { br.setTarget(nextLOrBlock); }
+                }
+                result.values.add(lastValue);
+            }
+        }
+
+        return result;
     }
 
-    private void visitLAndExp(LAndExpNode node) {
+    private Result visitLAndExp(LAndExpNode node) {
+        Result result = new Result();
 
+        List<EqExpNode> eqExps = node.getEqExps();
+        for (EqExpNode eqExp : eqExps) {
+            if (eqExp.isConst()) {
+                if (eqExp.getConstValue() == 0) {
+                    Instruction br = new BranchInstruction(null);
+                    curBasicBlock.addInstruction(br);
+                    result.values.add(curBasicBlock);
+                    curBasicBlock = curFunction.createBasicBlock();
+                    return result;
+                }
+            }
+            Result eq = visitEqExp(eqExp);
+            if (!eq.value.getType().equals(IRType.IntegerIRType.get(1))) {
+                if (eq.value.getType().equals(IRType.IntegerIRType.get(8))) {
+                    Instruction sext = new UnaryInstruction(
+                            UnaryInstruction.Operator.SExt,
+                            eq.value, IRType.IntegerIRType.get(32)
+                    );
+                    curBasicBlock.addInstruction(sext);
+                    eq.value = sext;
+                }
+                Instruction cmp = new CompareInstruction(
+                    CompareInstruction.Operator.NE,
+                    eq.value, ConstantInt.get(32, 0)
+                );
+                curBasicBlock.addInstruction(cmp);
+                eq.value = cmp;
+            }
+            BasicBlock trueBB = curFunction.createBasicBlock();
+            Instruction br = new BranchInstruction(eq.value, trueBB, null);
+            curBasicBlock.addInstruction(br);
+            result.values.add(curBasicBlock);
+            curBasicBlock = trueBB;
+        }
+        
+        return result;
     }
 
-    private void visitEqExp(EqExpNode node) {
+    private Result visitEqExp(EqExpNode node) {
+        Result result = new Result();
+        if (node.isConst()) {
+            result.value = ConstantInt.get(32, node.getConstValue());
+            result.isConst = true;
+            return result;
+        }
+        if (node.getOperator() == null) {
+            return visitRelExp(node.getRelExp());
+        }
 
+        Result left = visitEqExp(node.getEqExp());
+        Result right = visitRelExp(node.getRelExp());
+        if (!left.value.getType().equals(IRType.IntegerIRType.get(32))) {
+            Instruction sext = new UnaryInstruction(
+                UnaryInstruction.Operator.SExt,
+                left.value,
+                IRType.IntegerIRType.get(32)
+            );
+            curBasicBlock.addInstruction(sext);
+            left.value = sext;
+        }
+        if (!right.value.getType().equals(IRType.IntegerIRType.get(32))) {
+            Instruction sext = new UnaryInstruction(
+                UnaryInstruction.Operator.SExt,
+                right.value,
+                IRType.IntegerIRType.get(32)
+            );
+            curBasicBlock.addInstruction(sext);
+            right.value = sext;
+        }
+
+        CompareInstruction.Operator op = CompareInstruction.Operator.EQ;
+        if (node.getOperator().type() == TokenType.NEQ) {
+            op = CompareInstruction.Operator.NE;
+        }
+        Instruction icmp = new CompareInstruction(op, left.value, right.value);
+        curBasicBlock.addInstruction(icmp);
+        result.value = icmp;
+        return result;
     }
 
-    private void visitRelExp(RelExpNode node) {
+    private Result visitRelExp(RelExpNode node) {
+        Result result = new Result();
+        if (node.isConst()) {
+            result.value = ConstantInt.get(32, node.getConstValue());
+            result.isConst = true;
+            return result;
+        }
+        if (node.getOperator() == null) {
+            return visitAddExp(node.getAddExp());
+        }
+        
+        Result left = visitRelExp(node.getRelExp());
+        Result right = visitAddExp(node.getAddExp());
+        if (!left.value.getType().equals(IRType.IntegerIRType.get(32))) {
+            Instruction sext = new UnaryInstruction(
+                UnaryInstruction.Operator.SExt,
+                left.value,
+                IRType.IntegerIRType.get(32)
+            );
+            curBasicBlock.addInstruction(sext);
+            left.value = sext;
+        }
+        if (!right.value.getType().equals(IRType.IntegerIRType.get(32))) {
+            Instruction sext = new UnaryInstruction(
+                UnaryInstruction.Operator.SExt,
+                right.value,
+                IRType.IntegerIRType.get(32)
+            );
+            curBasicBlock.addInstruction(sext);
+            right.value = sext;
+        }
 
+        CompareInstruction.Operator op = CompareInstruction.Operator.SLT;
+        switch (node.getOperator().type()) {
+            case LSS -> op = CompareInstruction.Operator.SLT;
+            case LEQ -> op = CompareInstruction.Operator.SLE;
+            case GRE -> op = CompareInstruction.Operator.SGT;
+            case GEQ -> op = CompareInstruction.Operator.SGE;
+            default -> {}
+        }
+        Instruction icmp = new CompareInstruction(op, left.value, right.value);
+        curBasicBlock.addInstruction(icmp);
+        result.value = icmp;
+        return result;
     }
 
     private Result visitExp(ExpNode node) {
@@ -667,19 +886,19 @@ public class IRGenerator {
         Result right = visitMulExp(node.getMulExp());
         if (!left.value.getType().equals(right.value.getType())) {
             if (left.value.getType().equals(IRType.IntegerIRType.get(8))) {
-                Instruction zext = new UnaryInstruction(
-                        UnaryInstruction.Operator.ZExt,
+                Instruction sext = new UnaryInstruction(
+                        UnaryInstruction.Operator.SExt,
                         left.value, IRType.IntegerIRType.get(32)
                 );
-                curBasicBlock.addInstruction(zext);
-                left.value = zext;
+                curBasicBlock.addInstruction(sext);
+                left.value = sext;
             } else {
-                Instruction zext = new UnaryInstruction(
-                        UnaryInstruction.Operator.ZExt,
+                Instruction sext = new UnaryInstruction(
+                        UnaryInstruction.Operator.SExt,
                         right.value, IRType.IntegerIRType.get(32)
                 );
-                curBasicBlock.addInstruction(zext);
-                right.value = zext;
+                curBasicBlock.addInstruction(sext);
+                right.value = sext;
             }
         }
         BinaryInstruction.Operator op = BinaryInstruction.Operator.Add;
@@ -707,19 +926,19 @@ public class IRGenerator {
         Result right = visitUnaryExp(node.getUnaryExp());
         if (!left.value.getType().equals(right.value.getType())) {
             if (left.value.getType().equals(IRType.IntegerIRType.get(8))) {
-                Instruction zext = new UnaryInstruction(
-                        UnaryInstruction.Operator.ZExt,
+                Instruction sext = new UnaryInstruction(
+                        UnaryInstruction.Operator.SExt,
                         left.value, IRType.IntegerIRType.get(32)
                 );
-                curBasicBlock.addInstruction(zext);
-                left.value = zext;
+                curBasicBlock.addInstruction(sext);
+                left.value = sext;
             } else {
-                Instruction zext = new UnaryInstruction(
-                        UnaryInstruction.Operator.ZExt,
+                Instruction sext = new UnaryInstruction(
+                        UnaryInstruction.Operator.SExt,
                         right.value, IRType.IntegerIRType.get(32)
                 );
-                curBasicBlock.addInstruction(zext);
-                right.value = zext;
+                curBasicBlock.addInstruction(sext);
+                right.value = sext;
             }
         }
         BinaryInstruction.Operator op = BinaryInstruction.Operator.Mul;
@@ -759,7 +978,7 @@ public class IRGenerator {
                         Instruction cast;
                         if (arg.getType().equals(IRType.IntegerIRType.get(8))) {
                             cast = new UnaryInstruction(
-                                UnaryInstruction.Operator.ZExt,
+                                UnaryInstruction.Operator.SExt,
                                 arg,
                                 IRType.IntegerIRType.get(32)
                             );
@@ -783,20 +1002,25 @@ public class IRGenerator {
             result.value = call;
         } else {
             Result operand = visitUnaryExp(node.getUnaryExp());
+            Value zero = operand.value.getType().equals(IRType.IntegerIRType.get(32))
+                    ? ConstantInt.get(32, 0)
+                    : ConstantInt.get(8, 0);
             switch (node.getUnaryOp().getOperator().type()) {
                 case PLUS -> { result.value = operand.value; }
                 case MINU -> {
-                    Value zero = operand.value.getType().equals(IRType.IntegerIRType.get(32))
-                            ? ConstantInt.get(32, 0)
-                            : ConstantInt.get(8, 0);
                     Instruction sub = new BinaryInstruction(
                         BinaryInstruction.Operator.Sub,
                         zero, operand.value);
                     curBasicBlock.addInstruction(sub);
                     result.value = sub;
                 }
-                case NOT -> {
-                    // tbd
+                case NOT -> { // 仅在条件表达式中出现
+                    Instruction eq = new CompareInstruction(
+                        CompareInstruction.Operator.EQ,
+                        operand.value, zero
+                    );
+                    curBasicBlock.addInstruction(eq);
+                    result.value = eq;
                 }
                 default -> {}
             }

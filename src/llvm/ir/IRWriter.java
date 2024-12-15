@@ -3,7 +3,6 @@ package llvm.ir;
 import llvm.value.Function;
 import llvm.value.GlobalValue;
 import llvm.value.Parameter;
-import llvm.value.instruction.base.Instruction;
 import llvm.value.BasicBlock;
 
 import java.util.List;
@@ -67,10 +66,6 @@ public class IRWriter {
 
     private void generateBasicBlock(BasicBlock bb) {
         // only entry block now
-        ir.append(bb.getName().substring(1)).append(":\n");
-        for (Instruction inst : bb.getInstructions()) {
-            ir.append("    ").append(inst).append("\n");
-        }
-        ir.append("\n");
+        ir.append(bb); // block.toString()
     }
 }

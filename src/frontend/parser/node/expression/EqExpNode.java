@@ -11,6 +11,8 @@ public class EqExpNode extends Node {
     private RelExpNode relExp = null;
     private Token operator = null;
     private EqExpNode eqExp = null;
+    private boolean isConst = false;
+    private int constValue = 0;
 
     public EqExpNode(SyntaxCompType type, List<Node> children) {
         super(type, children);
@@ -25,7 +27,14 @@ public class EqExpNode extends Node {
         }
     }
 
+    public void setConstValue(int value) {
+        isConst = true;
+        constValue = value;
+    }
+
     public RelExpNode getRelExp() { return relExp; }
     public EqExpNode getEqExp() { return eqExp; }
     public Token getOperator() { return operator; }
+    public int getConstValue() { return constValue; }
+    public boolean isConst() { return isConst; }
 }

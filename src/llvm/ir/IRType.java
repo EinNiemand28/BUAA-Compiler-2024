@@ -1,7 +1,6 @@
 package llvm.ir;
 
 import java.util.List;
-import java.util.Objects;
 
 public abstract class IRType {
     public enum TypeID {

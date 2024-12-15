@@ -20,7 +20,11 @@ public class Value {
     public IRType getType() { return type; }
     public String getName() {
         if (name == null || name.isEmpty()) {
-            name = SlotTracker.getInstance().getSlot();
+            if (this instanceof BasicBlock) {
+                name = SlotTracker.getInstance().getBBSlot();
+            } else {
+                name = SlotTracker.getInstance().getSlot();
+            }
         }
         return name;
     }

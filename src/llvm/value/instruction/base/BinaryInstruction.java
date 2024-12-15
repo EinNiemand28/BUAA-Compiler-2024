@@ -9,8 +9,8 @@ public class BinaryInstruction extends Instruction {
         Mul("mul"),
         SDiv("sdiv"),
         SRem("srem"),
-        And("and"),
-        Or("or"),
+        // And("and"),
+        // Or("or"),
         ;
 
         private final String name;

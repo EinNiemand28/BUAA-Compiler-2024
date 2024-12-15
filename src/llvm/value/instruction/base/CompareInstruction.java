@@ -40,7 +40,7 @@ public class CompareInstruction extends Instruction {
 
     @Override
     public String getInstructionName() {
-        return "icmp";
+        return "icmp " + operator.getName();
     }
 
     @Override

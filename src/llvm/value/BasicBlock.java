@@ -2,6 +2,7 @@ package llvm.value;
 
 import llvm.value.instruction.base.Instruction;
 import llvm.value.instruction.memory.AllocaInstruction;
+import llvm.value.instruction.base.TerminatorInstruction;
 import llvm.ir.IRType;
 
 import java.util.List;
@@ -13,6 +14,9 @@ public class BasicBlock extends Value {
     private BasicBlock prevBlock;
     private BasicBlock nextBlock;
     private int allocNum;
+    private final List<BasicBlock> predecessors;
+    private final List<BasicBlock> successors;
+    private TerminatorInstruction terminator;
 
     public BasicBlock(String name, Function function) {
         super(IRType.LabelIRType.getInstance(), name);
@@ -24,6 +28,9 @@ public class BasicBlock extends Value {
         this.prevBlock = null;
         this.nextBlock = null;
         this.allocNum = 0;
+        this.predecessors = new ArrayList<>();
+        this.successors = new ArrayList<>();
+        this.terminator = null;
     }
 
     public void insertBefore(BasicBlock bb) {
@@ -56,22 +63,72 @@ public class BasicBlock extends Value {
     }
 
     public void addInstruction(Instruction instruction) {
+        if (instruction instanceof TerminatorInstruction) {
+            this.terminator = (TerminatorInstruction) instruction;
+        }
         instructions.add(instruction);
         instruction.setParent(this);
-        if (instruction instanceof AllocaInstruction) { allocNum++; }
     }
 
     public void insertInstruction(Instruction instruction, int index) {
+        if (instruction instanceof TerminatorInstruction) {
+            this.terminator = (TerminatorInstruction) instruction;
+        }
         instructions.add(index, instruction);
         instruction.setParent(this);
         if (instruction instanceof AllocaInstruction) { allocNum++; }
     }
 
     public void removeInstruction(Instruction instruction) {
+        if (instruction instanceof TerminatorInstruction && instruction == terminator) {
+            terminator = null;
+        }
         instructions.remove(instruction);
         instruction.setParent(null);
     }
 
+    public void addPredecessor(BasicBlock pred) {
+        if (!predecessors.contains(pred)) {
+            predecessors.add(pred);
+            pred.addSuccessor(this);
+        }
+    }
+
+    public void addSuccessor(BasicBlock succ) {
+        if (!successors.contains(succ)) {
+            successors.add(succ);
+            succ.addPredecessor(this);
+        }
+    }
+
+    public void removePredecessor(BasicBlock pred) {
+        predecessors.remove(pred);
+        pred.getSuccessors().remove(this);
+    }
+
+    public void removeSuccessor(BasicBlock succ) {
+        successors.remove(succ);
+        succ.getPredecessors().remove(this);
+    }
+
+    public boolean hasTerminator() {
+        return terminator != null;
+    }
+
+    public TerminatorInstruction getTerminator() {
+        return terminator;
+    }
+
+    public void setTerminator(TerminatorInstruction terminator) {
+        if (hasTerminator()) {
+            removeInstruction(this.terminator);
+        }
+        this.terminator = terminator;
+        addInstruction(terminator);
+    }
+
+    public List<BasicBlock> getPredecessors() { return predecessors; }
+    public List<BasicBlock> getSuccessors() { return successors; }
     public List<Instruction> getInstructions() { return instructions; }
     public Function getParent() { return parent; }
     public BasicBlock getPrevBlock() { return prevBlock; }
@@ -81,7 +138,7 @@ public class BasicBlock extends Value {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append(getName()).append(":").append("\n");
+        sb.append(super.getName()).append(":").append("\n");
         for (Instruction inst : instructions) {
             sb.append("  ").append(inst).append("\n");
         }
