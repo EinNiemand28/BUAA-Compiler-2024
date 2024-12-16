@@ -371,14 +371,17 @@ public class Visitor {
 
         result.type = new Type(var.getVarType());
         int offset = 0;
+        boolean flag = true;
         for (ExpNode exp : node.getExps()) {
             Result expResult = visitExp(exp);
             if (expResult.isConst) {
                 offset = expResult.constValue;
+            } else {
+                flag = false;
             }
             result.type.delDim();
         }
-        if (var.isConst() && result.type.getDimSize() == 0) {
+        if (var.isConst() && result.type.getDimSize() == 0 && flag) {
             result.isConst = true;
             if (offset < var.getConstValues().size()) {
                 result.constValue = var.getConstValues().get(offset);
@@ -555,7 +558,7 @@ public class Visitor {
                     result.constValue = 1;
                     result.isConst = true;
                 }
-            }
+            } else { result.isConst = false; }
         }
         if (result.isConst) {
             node.setConstValue(result.constValue);
@@ -573,7 +576,7 @@ public class Visitor {
                     result.constValue = 0;
                     result.isConst = true;
                 }
-            }
+            } else { result.isConst = false; }
         }
         if (result.isConst) {
             node.setConstValue(result.constValue);

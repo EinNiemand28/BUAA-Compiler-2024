@@ -25,6 +25,7 @@ public class ConstantString extends Constant{
                     case 'r' -> sb.append("\\0D");
                     case '\\' -> sb.append("\\5C");
                     case '\"' -> sb.append("\\22");
+                    case '0' -> sb.append("\\00");
                     default -> {}
                 }
                 i++;

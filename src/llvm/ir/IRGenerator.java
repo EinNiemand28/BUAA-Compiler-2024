@@ -1,5 +1,6 @@
 package llvm.ir;
 
+import frontend.enums.SyntaxCompType;
 import frontend.enums.TokenType;
 import frontend.parser.node.CompUnitNode;
 import frontend.parser.node.declaration.*;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Stack;
 
 public class IRGenerator {
     // all for value!!!
@@ -43,6 +45,8 @@ public class IRGenerator {
     private Function curFunction = null;
     private BasicBlock curBasicBlock = null;
     private SymbolTable curTable = null;
+    private Stack<List<BasicBlock>> breakBlocks = new Stack<>();
+    private Stack<List<BasicBlock>> continueBlocks = new Stack<>();
 
     public Module getIrModule() { return irModule; }
 
@@ -166,13 +170,28 @@ public class IRGenerator {
         if (node.getStringConst() != null) {
             String str = node.getStringConst();
             if (isGlobal) {
+                // System.out.println("str " + str + " size " + size);
                 result.value = ConstantString.get(str, size);
             } else {
                 List<Constant> elements = new ArrayList<>();
                 for (int i = 0; i < str.length(); i++) {
-                    elements.add(ConstantInt.get(8, str.charAt(i)));
+                    char ch = str.charAt(i);
+                    if (ch == '\\' && i + 1 < str.length()) {
+                        switch (str.charAt(i + 1)) {
+                            case 'n' -> elements.add(ConstantInt.get(8, '\n'));
+                            case 't' -> elements.add(ConstantInt.get(8, '\t'));
+                            case 'r' -> elements.add(ConstantInt.get(8, '\r'));
+                            case '\\' -> elements.add(ConstantInt.get(8, '\\'));
+                            case '\"' -> elements.add(ConstantInt.get(8, '\"'));
+                            case '0' -> elements.add(ConstantInt.get(8, '\0'));
+                            default -> {}
+                        }
+                        i++;
+                    } else {
+                        elements.add(ConstantInt.get(8, str.charAt(i)));
+                    }
                 }
-                result.value = ConstantArray.get(elementType, elements.size(), elements);
+                result.value = ConstantArray.get(elementType, size, elements);
             }
         } else if (node.getConstExp() != null) {
             result.value = ConstantInt.get(((IRType.IntegerIRType) elementType).getBitWidth(),
@@ -188,7 +207,7 @@ public class IRGenerator {
             if (zeroCount == elements.size()) {
                 result.value = null;
             } else {
-                result.value = ConstantArray.get(elementType, elements.size(), elements);
+                result.value = ConstantArray.get(elementType, size, elements);
             }
         }
         return result;
@@ -277,9 +296,23 @@ public class IRGenerator {
             } else {
                 List<Constant> elements = new ArrayList<>();
                 for (int i = 0; i < str.length(); i++) {
-                    elements.add(ConstantInt.get(8, str.charAt(i)));
+                    char ch = str.charAt(i);
+                    if (ch == '\\' && i + 1 < str.length()) {
+                        switch (str.charAt(i + 1)) {
+                            case 'n' -> elements.add(ConstantInt.get(8, '\n'));
+                            case 't' -> elements.add(ConstantInt.get(8, '\t'));
+                            case 'r' -> elements.add(ConstantInt.get(8, '\r'));
+                            case '\\' -> elements.add(ConstantInt.get(8, '\\'));
+                            case '\"' -> elements.add(ConstantInt.get(8, '\"'));
+                            case '0' -> elements.add(ConstantInt.get(8, '\0'));
+                            default -> {}
+                        }
+                        i++;
+                    } else {
+                        elements.add(ConstantInt.get(8, str.charAt(i)));
+                    }
                 }
-                result.value = ConstantArray.get(elementType, elements.size(), elements);
+                result.value = ConstantArray.get(elementType, size, elements);
             }
         } else if (node.getExp() != null) {
             if (isGlobal) {
@@ -375,6 +408,7 @@ public class IRGenerator {
         if (!curFunction.hasReturn()) {
             Instruction ret = new ReturnInstruction();
             curBasicBlock.addInstruction(ret);
+            curBasicBlock.seal();
         }
         curFunction = null;
         curBasicBlock = null;
@@ -478,6 +512,7 @@ public class IRGenerator {
                         br.setTrueTarget(curBasicBlock);
                     }
                 } else {
+
                     LOrExpNode lOrExp = node.getCond().getLOrExp();
                     if (lOrExp.isConst() && lOrExp.getConstValue() == 1) {
                         br.setTarget(curBasicBlock);
@@ -488,21 +523,37 @@ public class IRGenerator {
         BasicBlock thenBB = curBasicBlock;
         BasicBlock elseBB = null;
         visitStmt(node.getThenStmt());
+        thenBB = curBasicBlock;
+        BasicBlock target = null;
         if (node.getElseStmt() != null) {
-            System.out.println("else");
             elseBB = curFunction.createBasicBlock();
+            elseBB.insertAfter(curBasicBlock);
+            target = elseBB;
             curBasicBlock = elseBB;
             visitStmt(node.getElseStmt());
+            elseBB = curBasicBlock;
+
+            BasicBlock exitBB = curFunction.createBasicBlock();
+            exitBB.insertAfter(elseBB);
+            TerminatorInstruction terminator = new BranchInstruction(exitBB);
+            if (!thenBB.hasTerminator()) {
+                thenBB.setTerminator(terminator);
+            }
+            if (!elseBB.hasTerminator()) {
+                elseBB.setTerminator(terminator);
+            }
+            curBasicBlock = exitBB;
+        } else {
+            BasicBlock exitBB = curFunction.createBasicBlock();
+            exitBB.insertAfter(thenBB);
+            TerminatorInstruction terminator = new BranchInstruction(exitBB);
+            if (!thenBB.hasTerminator()) {
+                thenBB.setTerminator(terminator);
+            }
+            target = exitBB;
+            curBasicBlock = exitBB;
         }
 
-        curBasicBlock = curFunction.createBasicBlock();
-        TerminatorInstruction terminator = new BranchInstruction(curBasicBlock);
-        BasicBlock target = curBasicBlock;
-        thenBB.setTerminator(terminator);
-        if (elseBB != null) {
-            elseBB.setTerminator(terminator);
-            target = elseBB;
-        }
         for (Value value : cond.values) {
             BasicBlock bb = (BasicBlock) value;
             if (bb.getTerminator() instanceof BranchInstruction) {
@@ -511,26 +562,109 @@ public class IRGenerator {
                     if (br.getFalseTarget() == null) {
                         br.setFalseTarget(target);
                     }
-                } else {
-                    LOrExpNode lOrExp = node.getCond().getLOrExp();
-                    if (lOrExp.isConst() && lOrExp.getConstValue() == 0) {
-                        br.setTarget(target);
-                    }
+                } else if (br.getTarget() == null) {
+                    br.setTarget(target);
                 }
             }
         }
     }
 
     private void visitForLoopStmt(ForLoopStmtNode node) {
-        // tbd
+        breakBlocks.push(new ArrayList<>());
+        continueBlocks.push(new ArrayList<>());
+        if (node.getInitStmt() != null) {
+            System.out.println("init");
+            visitForStmt(node.getInitStmt());
+        }
+        BasicBlock condBB = curFunction.createBasicBlock();
+        condBB.insertAfter(curBasicBlock);
+        BranchInstruction br = new BranchInstruction(condBB);
+        curBasicBlock.addInstruction(br);
+        curBasicBlock = condBB;
+        
+        Result cond = null;
+        if (node.getCondStmt() != null) {
+            cond = visitCond(node.getCondStmt());
+            for (Value value : cond.values) {
+                BasicBlock bb = (BasicBlock) value;
+                if (bb.getTerminator() instanceof BranchInstruction) {
+                    br = (BranchInstruction) bb.getTerminator();
+                    if (br.isConditional()) {
+                        if (br.getTrueTarget() == null) {
+                            br.setTrueTarget(curBasicBlock);
+                        }
+                    } else {
+                        LOrExpNode lOrExp = node.getCondStmt().getLOrExp();
+                        if (lOrExp.isConst() && lOrExp.getConstValue() == 1) {
+                            br.setTarget(curBasicBlock);
+                        }
+                    }
+                }
+            }
+        } else {
+            curBasicBlock = curFunction.createBasicBlock();
+            curBasicBlock.insertAfter(condBB);
+        }
+
+        visitStmt(node.getStmt());
+        BasicBlock stepBB = curFunction.createBasicBlock();
+        stepBB.insertAfter(curBasicBlock);
+        br = new BranchInstruction(stepBB);
+        curBasicBlock.addInstruction(br);
+        curBasicBlock = stepBB;
+
+        if (node.getForStmt() != null) {
+            visitForStmt(node.getForStmt());
+        }
+        br = new BranchInstruction(condBB);
+        curBasicBlock.addInstruction(br);
+
+        curBasicBlock = curFunction.createBasicBlock();
+        curBasicBlock.insertAfter(stepBB);
+        if (cond != null) {
+            for (Value value : cond.values) {
+                BasicBlock bb = (BasicBlock) value;
+                if (bb.getTerminator() instanceof BranchInstruction) {
+                    br = (BranchInstruction) bb.getTerminator();
+                    if (br.isConditional()) {
+                        if (br.getFalseTarget() == null) {
+                            br.setFalseTarget(curBasicBlock);
+                        }
+                    } else if (br.getTarget() == null) {
+                        br.setTarget(curBasicBlock);
+                    }
+                }
+            }
+        }
+        for (BasicBlock bb : breakBlocks.peek()) {
+            br = (BranchInstruction) bb.getTerminator();
+            br.setTarget(curBasicBlock);
+        }
+        for (BasicBlock bb : continueBlocks.peek()) {
+            br = (BranchInstruction) bb.getTerminator();
+            br.setTarget(stepBB);
+        }
+        breakBlocks.pop();
+        continueBlocks.pop();
     }
 
     private void visitForStmt(ForStmtNode node) {
-        // tbd
+        AssignStmtNode assignStmt = new AssignStmtNode(SyntaxCompType.AssignStmt, List.of(node.getLVal(), node.getExp()));
+
+        visitStmt(assignStmt);
     }
 
     private void visitBreakStmt(BreakStmtNode node) {
-        // tbd
+        BranchInstruction br = new BranchInstruction(null);
+        curBasicBlock.addInstruction(br);
+        if (node.getBreakToken() != null) {
+            breakBlocks.peek().add(curBasicBlock);
+        } else {
+            continueBlocks.peek().add(curBasicBlock);
+        }
+        BasicBlock exitBB = curFunction.createBasicBlock();
+        exitBB.insertAfter(curBasicBlock);
+        curBasicBlock = exitBB;
     }
 
     private void visitReturnStmt(ReturnStmtNode node) {
@@ -558,7 +692,9 @@ public class IRGenerator {
             }
             Instruction ret = new ReturnInstruction(retValue.value);
             curBasicBlock.addInstruction(ret);
+
         }
+        curBasicBlock.seal();
         curFunction.setHasReturn(true);
     }
 
@@ -635,7 +771,6 @@ public class IRGenerator {
         String ident = node.getIdent().content();
         VarSymbol var = (VarSymbol) curTable.getSymbolByLine(ident, node.getIdent().lineno());
         Value baseAddr = var.getValue();
-        // System.out.println(node.getIdent().content() + " " + node.getIdent().lineno());
         if (!node.getExps().isEmpty()) {
             if (baseAddr.getType().isPointerTy() &&
                     ((IRType.PointerIRType) baseAddr.getType()).getElementType().isPointerTy()) {
@@ -694,10 +829,13 @@ public class IRGenerator {
         for (LAndExpNode lAndExp : node.getLAndExps()) {
             if (lAndExp.isConst()) {
                 if (lAndExp.getConstValue() == 1) {
+                    // value of LOrExp is true
                     Instruction br = new BranchInstruction(null);
                     curBasicBlock.addInstruction(br);
                     result.values.add(curBasicBlock);
-                    curBasicBlock = curFunction.createBasicBlock();
+                    BasicBlock exitBB = curFunction.createBasicBlock();
+                    exitBB.insertAfter(curBasicBlock);
+                    curBasicBlock = exitBB;
                     break;
                 }
             }
@@ -705,12 +843,14 @@ public class IRGenerator {
         }
 
         for (int i = 0; i < lAndResults.size(); i++) {
+            if (lAndResults.get(i).values.isEmpty()) { continue; }
             Value lastValue = lAndResults.get(i).values.get(lAndResults.get(i).values.size() - 1);
             BranchInstruction br = (BranchInstruction) ((BasicBlock) lastValue).getTerminator();
             if (br.isConditional()) { br.setTrueTarget(null); }
             if (i == lAndResults.size() - 1) {
                 result.values.addAll(lAndResults.get(i).values);
             } else {
+                if (br.isConditional()) { result.values.add(lastValue); }
                 BasicBlock nextLOrBlock = (BasicBlock) lAndResults.get(i + 1).values.get(0);
                 for (Value value : lAndResults.get(i).values) {
                     BasicBlock bb = (BasicBlock) value;
@@ -718,7 +858,7 @@ public class IRGenerator {
                     if (br.isConditional()) { br.setFalseTarget(nextLOrBlock); }
                     else if (br.getTarget() == null) { br.setTarget(nextLOrBlock); }
                 }
-                result.values.add(lastValue);
+                // result.values.add(lastValue);
             }
         }
 
@@ -732,11 +872,16 @@ public class IRGenerator {
         for (EqExpNode eqExp : eqExps) {
             if (eqExp.isConst()) {
                 if (eqExp.getConstValue() == 0) {
+                    // value of LAndExp is false
                     Instruction br = new BranchInstruction(null);
                     curBasicBlock.addInstruction(br);
                     result.values.add(curBasicBlock);
-                    curBasicBlock = curFunction.createBasicBlock();
+                    BasicBlock exitBB = curFunction.createBasicBlock();
+                    exitBB.insertAfter(curBasicBlock);
+                    curBasicBlock = exitBB;
                     return result;
+                } else {
+                    continue;
                 }
             }
             Result eq = visitEqExp(eqExp);
@@ -757,6 +902,7 @@ public class IRGenerator {
                 eq.value = cmp;
             }
             BasicBlock trueBB = curFunction.createBasicBlock();
+            trueBB.insertAfter(curBasicBlock);
             Instruction br = new BranchInstruction(eq.value, trueBB, null);
             curBasicBlock.addInstruction(br);
             result.values.add(curBasicBlock);

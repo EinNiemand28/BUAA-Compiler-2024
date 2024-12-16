@@ -3,6 +3,7 @@ package llvm.ir;
 import llvm.value.Function;
 import llvm.value.GlobalValue;
 import llvm.value.Parameter;
+import llvm.value.instruction.terminator.BranchInstruction;
 import llvm.value.BasicBlock;
 
 import java.util.List;
@@ -59,6 +60,10 @@ public class IRWriter {
         ir.append(") {\n");
 
         for (BasicBlock bb : func.getBasicBlocks()) {
+            if (!bb.hasTerminator() && bb.getNextBlock() != null) {
+                BranchInstruction br = new BranchInstruction(bb.getNextBlock());
+                bb.setTerminator(br);
+            }
             generateBasicBlock(bb);
         }
         ir.append("}\n");
