@@ -600,7 +600,7 @@ public class Visitor {
             }
         }
         if (result.isConst) {
-            node.setConstValue(result.constValue > 0 ? 1 : 0);
+            node.setConstValue(result.constValue != 0 ? 1 : 0);
         }
         return result;
     }

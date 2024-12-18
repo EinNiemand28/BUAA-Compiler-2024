@@ -45,8 +45,8 @@ public class IRGenerator {
     private Function curFunction = null;
     private BasicBlock curBasicBlock = null;
     private SymbolTable curTable = null;
-    private Stack<List<BasicBlock>> breakBlocks = new Stack<>();
-    private Stack<List<BasicBlock>> continueBlocks = new Stack<>();
+    private final Stack<List<BasicBlock>> breakBlocks = new Stack<>();
+    private final Stack<List<BasicBlock>> continueBlocks = new Stack<>();
 
     public Module getIrModule() { return irModule; }
 
@@ -380,17 +380,9 @@ public class IRGenerator {
 
     private void visitFuncDef(FuncDefNode node) {
         FuncSymbol func = (FuncSymbol) curTable.getSymbolByLine(node.getIdent().content(), node.getIdent().lineno());
-        // System.out.println(func.getFuncType().getTypeName());
-        // for (int dim : func.getFuncType().getDims()) {
-        //     System.out.println(dim);
-        // }
         IRType retType = IRType.convert(func.getFuncType().getTypeName(), func.getFuncType().getDims());
         ArrayList<IRType> paramTypes = new ArrayList<>();
         for (Type type : func.getParamTypeList()) {
-            // System.out.println(type.getTypeName() + " " + type.getDims().size());
-            // for (int dim : type.getDims()) {
-            //     System.out.println(dim);
-            // }
             paramTypes.add(IRType.convert(type.getTypeName(), type.getDims()));
         }
         IRType funcType = IRType.FunctionIRType.get(retType, paramTypes);
@@ -405,7 +397,15 @@ public class IRGenerator {
         }
         visitBlock(node.getBlock());
 
+        if (curFunction.getReturnType().isVoidTy()) {
+            if (!curBasicBlock.hasTerminator()) {
+                Instruction ret = new ReturnInstruction();
+                curBasicBlock.addInstruction(ret);
+                curBasicBlock.seal();
+            }
+        }
         if (!curFunction.hasReturn()) {
+            System.out.println("no return");
             Instruction ret = new ReturnInstruction();
             curBasicBlock.addInstruction(ret);
             curBasicBlock.seal();
@@ -512,7 +512,6 @@ public class IRGenerator {
                         br.setTrueTarget(curBasicBlock);
                     }
                 } else {
-
                     LOrExpNode lOrExp = node.getCond().getLOrExp();
                     if (lOrExp.isConst() && lOrExp.getConstValue() == 1) {
                         br.setTarget(curBasicBlock);
@@ -602,8 +601,11 @@ public class IRGenerator {
                 }
             }
         } else {
-            curBasicBlock = curFunction.createBasicBlock();
-            curBasicBlock.insertAfter(condBB);
+            BasicBlock bodyBB = curFunction.createBasicBlock();
+            bodyBB.insertAfter(condBB);
+            br = new BranchInstruction(bodyBB);
+            curBasicBlock.addInstruction(br);
+            curBasicBlock = bodyBB;
         }
 
         visitStmt(node.getStmt());
@@ -827,19 +829,13 @@ public class IRGenerator {
 
         List<Result> lAndResults = new ArrayList<>();
         for (LAndExpNode lAndExp : node.getLAndExps()) {
+            lAndResults.add(visitLAndExp(lAndExp));
             if (lAndExp.isConst()) {
                 if (lAndExp.getConstValue() == 1) {
                     // value of LOrExp is true
-                    Instruction br = new BranchInstruction(null);
-                    curBasicBlock.addInstruction(br);
-                    result.values.add(curBasicBlock);
-                    BasicBlock exitBB = curFunction.createBasicBlock();
-                    exitBB.insertAfter(curBasicBlock);
-                    curBasicBlock = exitBB;
                     break;
                 }
             }
-            lAndResults.add(visitLAndExp(lAndExp));
         }
 
         for (int i = 0; i < lAndResults.size(); i++) {
@@ -907,6 +903,15 @@ public class IRGenerator {
             curBasicBlock.addInstruction(br);
             result.values.add(curBasicBlock);
             curBasicBlock = trueBB;
+        }
+
+        if (result.values.isEmpty()) {
+            BasicBlock exitBB = curFunction.createBasicBlock();
+            Instruction br = new BranchInstruction(exitBB);
+            curBasicBlock.addInstruction(br);
+            result.values.add(curBasicBlock);
+            exitBB.insertAfter(curBasicBlock);
+            curBasicBlock = exitBB;
         }
         
         return result;
