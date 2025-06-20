@@ -916,36 +916,166 @@ for (Node child : node.getChildren()) {
 
 ### 总体概述
 
+使用 `llvm` 作为中间代码。
 
 ### 架构设计
 
-| LLVM IR         | 使用方法                                                     | 简介                                                   |
-| --------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| `add`           | `<result> = add <ty> <op1>, <op2>`                           | `nsw` - 发生有符号溢出                                 |
-| `sub`           | `<result> = sub <ty> <op1>, <op2>`                           |                                                        |
-| `mul`           | `<result> = mul <ty> <op1>, <op2>`                           |                                                        |
-| `sdiv`          | `<result> = sdiv <ty> <op1>, <op2>`                          | 有符号除法                                             |
-| `srem`          | `<result> = srem <ty> <op1>, <op2>`                          | 有符号取余                                             |
-| `icmp`          | `<result> = icmp <cond> <ty> <op1>, <op2>`                   | 比较指令                                               |
-| `and`           | `<result> = and <ty> <op1>, <op2>`                           | 按位与                                                 |
-| `or`            | `<result> = or <ty> <op1>, <op2>`                            | 按位或                                                 |
-| `call`          | `<result> = call [ret attrs] <ty> <name>(<...args>)`         | 函数调用                                               |
-| `alloca`        | `<result> = alloca <type>`                                   | 分配内存                                               |
-| `load`          | `<result> = load <ty>, ptr <pointer>`                        | 读取内存                                               |
-| `store`         | `store <ty> <value>, ptr <pointer>`                          | 写内存                                                 |
-| `getelementptr` | `<result> = getelementptr <ty>, ptr <ptrval>{, <ty> <idx>}*` | 计算目标元素的位置                                     |
-| `phi`           | `<result> = phi [fast-math-flags] <ty> [<val0>, <label0>], ...` |                                                        |
-| `zext..to`      | `<result> = zext <ty> <value> to <ty2>`                      | 将 `ty` 的 `value` 的 type 扩充为 `ty2`（zero extend） |
-| `trunc..to`     | `<result> = trunc <ty> <value> to <ty2>`                     | 将 `ty` 的 `value` 的 type 缩减为 `ty2`（truncate）    |
-| `br`            | `br i1 <cond>, label <iftrue>, label <iffalse>` `br label <dest>` | 改变控制流                                             |
-| `ret`           | `ret <type> <value> `, `ret void`                            | 退出当前函数，并返回值                                 |
+#### llvm
 
+![图片#50% #center](https://judge.buaa.edu.cn/cguserImages?_img=30639449344bc202b2e4ac7ba5b5ab1a.png)
 
+我沿用了教程中介绍的 `llvm` 架构和其一切皆 value 的思想。
+
+然后设计并使用 `IRGenerator` 单例模式，再次遍历语法树（类似语义分析的过程）生成 `llvm.module` 。
+
+```java
+public class IRGenerator {
+    private static class Result {
+        // 综合属性
+        public boolean isConst = false;
+        public Value value = null;
+        public List<Value> values = new ArrayList<>();
+    }
+
+    private static final IRGenerator instance = new IRGenerator();
+    private IRGenerator() {}
+    public static IRGenerator getInstance() { return instance; }
+    
+    public Module getIrModule() { return irModule; }
+    public void visit(CompUnitNode node) {
+        if (!irModule.getFunctions().isEmpty()) { return; }
+        isGlobal = true;
+        for (DeclNode decl : node.getDecls()) {
+            visitDecl(decl);
+        }
+        isGlobal = false;
+        for (FuncDefNode funcDef : node.getFuncDefs()) {
+            visitFuncDef(funcDef);
+        }
+        visitMainFuncDef(node.getMainFunc());
+    }
+    
+    // ... (一系列私有visit函数)
+}
+```
 
 ### 实现细节
 
+#### 符号表切换
+
+我在之前使用的树状符号表，为了在遍历语法树的过程中能够得到正确的 symbol 信息，我对符号表进行了一些修改。
+
+```java
+public class SymbolTable {
+    public void resetWalker() { index = -1; }
+    public SymbolTable next() { // 遍历
+        if (index + 1 < subTables.size()) {
+            index++;
+            return subTables.get(index);
+        }
+        if (preTable != null) {
+            index = -1;
+            return preTable;
+        }
+        return null;
+    }
+    
+    public Symbol getSymbolByLine(String content, int line) {
+        // 处理同名变量，只有在当前位置之前定义的变量才有效
+        if (contains(content) && symbols.get(content).getToken().lineno() <= line) {
+            return symbols.get(content);
+        }
+        if (preTable != null) {
+            return preTable.getSymbolByLine(content, line);
+        } else {
+            return null;
+        }
+    }
+}
+
+public class IRGenerator {
+    public void move2NextTable() {
+        curTable = curTable.next();
+    }
+```
+
+#### 短路求值
+
+我在处理 `Cond <- LOrExp <- LAndExp` 时就生成了相应的所有块和跳转代码，然后在进行综合时再填写/修改为正确的跳转标签。
+
 ### 文件组织
+
+```markdown
+├───📁 frontend/
+│   ├───📁 enums/
+│   │   ├───📄 ErrorType.java
+│   │   ├───📄 SymbolType.java
+│   │   ├───📄 SyntaxCompType.java
+│   │   └───📄 TokenType.java
+│   ├───📁 lexer/
+│   │   ├───📄 Lexer.java
+│   │   ├───📄 Token.java
+│   │   └───📄 TokenStream.java
+│   ├───📁 parser/
+│   │   ├───📁 node/
+│   │   │   └───...
+│   │   └───📄 Parser.java
+│   ├───📁 symbol/
+│   │   ├───📄 FuncSymbol.java
+│   │   ├───📄 Symbol.java
+│   │   ├───📄 SymbolTable.java
+│   │   ├───📄 Type.java
+│   │   └───📄 VarSymbol.java
+│   └───📁 visitor/
+│       └───📄 Visitor.java
+├───📁 llvm/
+│   ├───📁 ir/
+│   │   ├───📄 IRGenerator.java
+│   │   ├───📄 IRType.java
+│   │   ├───📄 IRWriter.java
+│   │   ├───📄 Module.java
+│   │   └───📄 SlotTracker.java
+│   └───📁 value/
+│       ├───📁 constant/
+│       │   ├───📄 Constant.java
+│       │   ├───📄 ConstantArray.java
+│       │   ├───📄 ConstantInt.java
+│       │   └───📄 ConstantString.java
+│       ├───📁 instruction/
+│       │   ├───📁 base/
+│       │   │   ├───📄 BinaryInstruction.java
+│       │   │   ├───📄 CallInstruction.java
+│       │   │   ├───📄 CompareInstruction.java
+│       │   │   ├───📄 Instruction.java
+│       │   │   ├───📄 MemoryInstruction.java
+│       │   │   ├───📄 TerminatorInstruction.java
+│       │   │   └───📄 UnaryInstruction.java
+│       │   ├───📁 memory/
+│       │   │   ├───📄 AllocaInstruction.java
+│       │   │   ├───📄 GetElementPtrInstruction.java
+│       │   │   ├───📄 LoadInstruction.java
+│       │   │   └───📄 StoreInstruction.java
+│       │   └───📁 terminator/
+│       │       ├───📄 BranchInstruction.java
+│       │       └───📄 ReturnInstruction.java
+│       ├───📄 BasicBlock.java
+│       ├───📄 Function.java
+│       ├───📄 GlobalValue.java
+│       ├───📄 Parameter.java
+│       ├───📄 Use.java
+│       ├───📄 User.java
+│       └───📄 Value.java
+├───📁 utils/
+│   ├───📄 Error.java
+│   ├───📄 Printer.java
+│   └───📄 Recorder.java
+└───📄 Compiler.java
+```
 
 ### 修改
 
+无
+
 ## 代码优化设计
+
+未实现优化

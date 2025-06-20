@@ -49,6 +49,17 @@ public class GlobalValue extends Value {
     public boolean isConst() { return isConst; }
     public boolean isUnnamedAddr() { return isUnnamedAddr; }
 
+    public int getSize() {
+        if (initializer != null) {
+            return initializer.getSize();
+        }
+        IRType type = ((IRType.PointerIRType) getType()).getElementType();
+        if (type instanceof IRType.ArrayIRType) {
+            return ((IRType.ArrayIRType) type).getSize();
+        }
+        return 0;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

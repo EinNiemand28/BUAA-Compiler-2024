@@ -48,6 +48,14 @@ public class ConstantArray extends Constant {
         return elements;
     }
 
+    public int getSize() {
+        int size = 0;
+        for (Constant c : elements) {
+            size += c.getSize();
+        }
+        return size;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

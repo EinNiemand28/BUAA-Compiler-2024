@@ -9,4 +9,5 @@ public abstract class Constant extends Value {
     }
 
     public abstract boolean isZero();
+    public abstract int getSize();
 }

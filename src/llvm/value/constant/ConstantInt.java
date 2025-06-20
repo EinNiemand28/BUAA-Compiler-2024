@@ -20,6 +20,10 @@ public class ConstantInt extends Constant {
         return value == 0;
     }
 
+    public int getSize() {
+        return 1;
+    }
+
     @Override
     public String toString() {
         return "" + value;

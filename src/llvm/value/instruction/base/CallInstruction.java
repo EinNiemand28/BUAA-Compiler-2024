@@ -3,15 +3,18 @@ package llvm.value.instruction.base;
 import llvm.value.Value;
 import llvm.value.Function;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
 public class CallInstruction extends Instruction {
     private final Function function;
+    private List<Value> args;
     
     public CallInstruction(Function function, List<Value> arguments) {
         super(function.getReturnType(), "", arguments.size() + 1);
         this.function = function;
+        args = new ArrayList<>(arguments);
         setOperand(0, function);
         for (int i = 0; i < arguments.size(); i++) {
             setOperand(i + 1, arguments.get(i));
@@ -19,6 +22,12 @@ public class CallInstruction extends Instruction {
     }
 
     public Function getFunction() { return function; }
+
+    public List<Value> getArguments() { return args; }
+
+    public Function getCallee() {
+        return function;
+    }
 
     @Override
     public String getInstructionName() {

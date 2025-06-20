@@ -16,6 +16,7 @@ public class Printer {
     private static FileOutputStream errorFile = null;
     private static FileOutputStream symbolFile = null;
     private static FileOutputStream llvmIrFile = null;
+    private static FileOutputStream mipsFile = null;
 
     public static void init() throws FileNotFoundException {
         lexerFile = new FileOutputStream("lexer.txt");
@@ -23,6 +24,7 @@ public class Printer {
         errorFile = new FileOutputStream("error.txt");
         symbolFile = new FileOutputStream("symbol.txt");
         llvmIrFile = new FileOutputStream("llvm_ir.txt");
+        mipsFile = new FileOutputStream("mips.txt");
     }
 
     public static void printTokens(List<Token> tokenList) throws IOException {
@@ -52,11 +54,16 @@ public class Printer {
         llvmIrFile.write(irWriter.generateIr().getBytes());
     }
 
+    // public static void printMips(Target target) throws IOException {
+    //     mipsFile.write(target.toString().getBytes());
+    // }
+
     public static void close() throws IOException {
         lexerFile.close();
         parserFile.close();
         errorFile.close();
         symbolFile.close();
         llvmIrFile.close();
+        mipsFile.close();
     }
 }

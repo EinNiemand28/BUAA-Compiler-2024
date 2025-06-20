@@ -32,13 +32,17 @@ public class Compiler {
         Visitor.getInstance().visit((CompUnitNode) compUnit);
         SymbolTable symbolTable = Visitor.getInstance().getCurTable();
         symbolTable.print();
-//        System.out.println(symbolTable.getId());
 
         if (Recorder.getErrors().isEmpty()) {
             IRGenerator.getInstance().setSymbolTable(symbolTable);
             IRGenerator.getInstance().visit((CompUnitNode) compUnit);
             Module module = IRGenerator.getInstance().getIrModule();
             Printer.printIr(module);
+
+            // MIPSGenerator.getInstance().setIrModule(module);
+            // MIPSGenerator.getInstance().generate();
+            // Target target = MIPSGenerator.getInstance().getTarget();
+            // Printer.printMips(target);
         }
         Recorder.printErrorMessages();
 

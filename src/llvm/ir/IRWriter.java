@@ -34,7 +34,7 @@ public class IRWriter {
     }
 
     private void generateGlobalValues() {
-        for (GlobalValue global : module.getGlobalsValues()) {
+        for (GlobalValue global : module.getGlobalValues()) {
             ir.append(global).append("\n");
         }
         ir.append("\n");
